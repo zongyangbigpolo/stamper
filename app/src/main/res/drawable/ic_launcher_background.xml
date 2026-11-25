@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Anime sunny spring sky gradient -->
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="54"
+                android:startY="0"
+                android:endX="54"
+                android:endY="108"
+                android:type="linear">
+                <item android:offset="0.0" android:color="#29B6F6" />
+                <item android:offset="0.52" android:color="#81D4FA" />
+                <item android:offset="0.82" android:color="#E6EE9C" />
+                <item android:offset="1.0" android:color="#9CCC65" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Warm anime sun glow in upper right -->
+    <path
+        android:fillColor="#44FFFde7"
+        android:pathData="M82,22m-22,0a22,22 0 1,0 44,0a22,22 0 1,0 -44,0" />
+    <path
+        android:fillColor="#66FFFFFF"
+        android:pathData="M82,22m-12,0a12,12 0 1,0 24,0a12,12 0 1,0 -24,0" />
+
+    <!-- Soft Ghibli-style anime clouds -->
+    <path
+        android:fillColor="#55FFFFFF"
+        android:pathData="M14,62c0,-5 4,-9 9,-9c1.5,-4.5 6,-7.5 11,-7.5c6,0 11,4.5 11.8,10.2c3.5,0.6 6.2,3.6 6.2,7.3c0,4.1 -3.3,7.5 -7.5,7.5H21.5C17.4,70.5 14,66.7 14,62z" />
+    <path
+        android:fillColor="#48FFFFFF"
+        android:pathData="M62,70c0,-4 3.2,-7.2 7.2,-7.2c1.2,-3.6 4.8,-6 8.8,-6c4.8,0 8.8,3.6 9.4,8.2c2.8,0.5 5,2.9 5,5.8c0,3.3 -2.7,6 -6,6H68C64.7,76.8 62,73.8 62,70z" />
+</vector>
