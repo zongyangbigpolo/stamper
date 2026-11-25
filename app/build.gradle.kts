@@ -48,9 +48,12 @@ android {
             val ciKeystore = System.getenv("STAMPER_KEYSTORE_FILE")
             if (!ciKeystore.isNullOrBlank() && file(ciKeystore).exists()) {
                 storeFile = file(ciKeystore)
-                storePassword = System.getenv("STAMPER_KEYSTORE_PASSWORD") ?: "android"
-                keyAlias = System.getenv("STAMPER_KEY_ALIAS") ?: "androiddebugkey"
-                keyPassword = System.getenv("STAMPER_KEY_PASSWORD") ?: "android"
+                // Unset GitHub secrets arrive as empty strings, so treat blank as "use default".
+                fun envOr(name: String, default: String) =
+                    System.getenv(name)?.takeUnless { it.isBlank() } ?: default
+                storePassword = envOr("STAMPER_KEYSTORE_PASSWORD", "android")
+                keyAlias = envOr("STAMPER_KEY_ALIAS", "androiddebugkey")
+                keyPassword = envOr("STAMPER_KEY_PASSWORD", "android")
             }
         }
     }
