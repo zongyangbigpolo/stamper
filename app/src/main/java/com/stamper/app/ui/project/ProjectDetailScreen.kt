@@ -1,5 +1,31 @@
 package com.stamper.app.ui.project
 
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.outlined.Approval
+import androidx.compose.material.icons.outlined.Checklist
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Deselect
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.FolderZip
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.SearchOff
+import androidx.compose.material.icons.outlined.SelectAll
+import androidx.compose.material.icons.outlined.Share
+import androidx.compose.material.icons.outlined.ZoomOutMap
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.MoreVert
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.ui.draw.shadow
+import com.stamper.app.ui.components.HintIconButton
+import com.stamper.app.ui.components.WithHint
+import com.stamper.app.ui.theme.StamperPalette
 import android.content.ClipData
 import android.content.Intent
 import android.net.Uri
@@ -234,172 +260,221 @@ fun ProjectDetailScreen(
         }
     }
 
+    var showSearch by remember { mutableStateOf(false) }
+    var showMenu by remember { mutableStateOf(false) }
+
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             if (selectionMode) {
                 TopAppBar(
-                    title = {
-                        Text(
-                            text = "已选择 ${selectedPhotoIds.size} 张",
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                    title = { CountPill(count = selectedPhotoIds.size) },
                     navigationIcon = {
-                        IconButton(
+                        HintIconButton(
+                            icon = Icons.Rounded.Close,
+                            hint = "退出多选",
                             onClick = {
                                 selectionMode = false
                                 selectedPhotoIds = emptySet()
                             }
-                        ) {
-                            Icon(Icons.Default.Close, contentDescription = "退出多选")
-                        }
+                        )
                     },
                     actions = {
                         val allVisibleIds = filteredPhotos.map { it.id }.toSet()
                         val allSelected = allVisibleIds.isNotEmpty() && selectedPhotoIds.containsAll(allVisibleIds)
-                        TextButton(
+                        HintIconButton(
+                            icon = if (allSelected) Icons.Outlined.Deselect else Icons.Outlined.SelectAll,
+                            hint = if (allSelected) "取消全选" else "全选",
                             onClick = {
-                                selectedPhotoIds = if (allSelected) {
-                                    selectedPhotoIds - allVisibleIds
-                                } else {
-                                    selectedPhotoIds + allVisibleIds
-                                }
+                                selectedPhotoIds = if (allSelected) selectedPhotoIds - allVisibleIds else selectedPhotoIds + allVisibleIds
                             }
-                        ) {
-                            Icon(Icons.Default.SelectAll, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(if (allSelected) "取消全选" else "全选")
-                        }
+                        )
                     }
                 )
             } else {
-                TopAppBar(
-                    title = {
-                        Column {
+                Column(modifier = Modifier.background(MaterialTheme.colorScheme.background)) {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                        title = {
                             Text(
-                                text = project?.name ?: "项目详情",
+                                text = project?.name ?: "",
                                 fontWeight = FontWeight.Bold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Text(
-                                text = "共 ${photos.size} 张 · Pictures/Stamper/${project?.folderName.orEmpty()}",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
-                    },
-                    actions = {
-                        if (photos.isNotEmpty()) {
-                            IconButton(onClick = { watermarkPhotoIds = filteredPhotos.map { it.id } }) {
-                                Icon(Icons.Default.BrandingWatermark, contentDescription = "批量添加信息水印")
+                        },
+                        navigationIcon = {
+                            HintIconButton(icon = Icons.AutoMirrored.Rounded.ArrowBack, hint = "返回", onClick = onNavigateBack)
+                        },
+                        actions = {
+                            if (photos.isNotEmpty()) {
+                                HintIconButton(
+                                    icon = Icons.Outlined.Search,
+                                    hint = "搜索",
+                                    onClick = {
+                                        showSearch = !showSearch
+                                        if (!showSearch) searchQuery = ""
+                                    }
+                                )
+                                HintIconButton(
+                                    icon = Icons.Outlined.Approval,
+                                    hint = "批量水印",
+                                    onClick = { watermarkPhotoIds = filteredPhotos.map { it.id } }
+                                )
                             }
-                        }
-                        if (photos.isNotEmpty()) {
-                            IconButton(
-                                onClick = {
-                                    selectionMode = true
-                                    selectedPhotoIds = emptySet()
+                            Box {
+                                HintIconButton(icon = Icons.Rounded.MoreVert, hint = "更多", onClick = { showMenu = true })
+                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    if (project != null) {
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                                            text = { Text("改名") },
+                                            onClick = {
+                                                showMenu = false
+                                                renamingProjectText = project.name
+                                                showRenameProjectDialog = true
+                                            }
+                                        )
+                                    }
+                                    if (photos.isNotEmpty()) {
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Outlined.Checklist, contentDescription = null) },
+                                            text = { Text("多选") },
+                                            onClick = {
+                                                showMenu = false
+                                                selectionMode = true
+                                                selectedPhotoIds = emptySet()
+                                            }
+                                        )
+                                        DropdownMenuItem(
+                                            leadingIcon = { Icon(Icons.Outlined.FolderZip, contentDescription = null) },
+                                            text = { Text("打包导出") },
+                                            onClick = {
+                                                showMenu = false
+                                                onExportProjectZip(projectId)
+                                            }
+                                        )
+                                    }
+                                    if (projectId != SettingsRepository.DEFAULT_PROJECT_ID) {
+                                        DropdownMenuItem(
+                                            leadingIcon = {
+                                                Icon(Icons.Outlined.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                                            },
+                                            text = { Text("删除分组", color = MaterialTheme.colorScheme.error) },
+                                            onClick = {
+                                                showMenu = false
+                                                showDeleteProjectDialog = true
+                                            }
+                                        )
+                                    }
                                 }
-                            ) {
-                                Icon(Icons.Default.Checklist, contentDescription = "多选移动或管理照片")
                             }
                         }
-                        if (project != null) {
-                            IconButton(
-                                onClick = {
-                                    renamingProjectText = project.name
-                                    showRenameProjectDialog = true
+                    )
+                    if (showSearch) {
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
+                            trailingIcon = {
+                                if (searchQuery.isNotEmpty()) {
+                                    HintIconButton(icon = Icons.Rounded.Close, hint = "清除", onClick = { searchQuery = "" })
                                 }
-                            ) {
-                                Icon(Icons.Default.Edit, contentDescription = "修改项目名称")
-                            }
-                        }
-                        if (photos.isNotEmpty()) {
-                            IconButton(onClick = { onExportProjectZip(projectId) }) {
-                                Icon(Icons.Default.FolderZip, contentDescription = "打包导出 ZIP")
-                            }
-                        }
-                        if (projectId != SettingsRepository.DEFAULT_PROJECT_ID) {
-                            IconButton(onClick = { showDeleteProjectDialog = true }) {
-                                Icon(Icons.Default.Delete, contentDescription = "删除项目")
-                            }
-                        }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 4.dp)
+                        )
                     }
-                )
+                }
             }
         },
         floatingActionButton = {
             if (!selectionMode) {
-                ExtendedFloatingActionButton(
-                    onClick = {
-                        scope.launch {
-                            repository.settingsRepository.setActiveProjectId(projectId)
-                        }
-                        onOpenCamera()
-                    },
-                    icon = { Icon(Icons.Default.CameraAlt, contentDescription = null) },
-                    text = { Text("拍入此分组") }
-                )
+                WithHint("拍入此分组") {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .shadow(10.dp, RoundedCornerShape(22.dp), spotColor = StamperPalette.Gold)
+                            .clip(RoundedCornerShape(22.dp))
+                            .background(StamperPalette.Gold)
+                            .clickable {
+                                scope.launch { repository.settingsRepository.setActiveProjectId(projectId) }
+                                onOpenCamera()
+                            }
+                    ) {
+                        Icon(Icons.Outlined.PhotoCamera, contentDescription = "拍入此分组", tint = StamperPalette.GoldInk, modifier = Modifier.size(28.dp))
+                    }
+                }
             }
         },
         bottomBar = {
             if (selectionMode) {
+                val enabled = selectedPhotoIds.isNotEmpty()
                 Surface(
-                    tonalElevation = 8.dp,
+                    color = StamperPalette.Ink,
+                    shape = RoundedCornerShape(22.dp),
                     shadowElevation = 12.dp,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                        .height(66.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                        horizontalArrangement = Arrangement.SpaceAround,
+                        modifier = Modifier.fillMaxSize()
                     ) {
-                        val enabled = selectedPhotoIds.isNotEmpty()
-                        SelectionActionButton(
-                            icon = Icons.Default.BrandingWatermark,
-                            label = "加水印",
+                        HintIconButton(
+                            icon = Icons.Outlined.Approval,
+                            hint = "加水印",
                             enabled = enabled,
-                            emphasized = true,
                             onClick = { watermarkPhotoIds = filteredPhotos.map { it.id }.filter { it in selectedPhotoIds } },
-                            modifier = Modifier.weight(1f)
+                            colors = IconButtonDefaults.iconButtonColors(
+                                containerColor = StamperPalette.Gold,
+                                contentColor = StamperPalette.GoldInk,
+                                disabledContainerColor = Color.White.copy(alpha = 0.12f),
+                                disabledContentColor = Color.White.copy(alpha = 0.35f)
+                            )
                         )
-                        SelectionActionButton(
-                            icon = Icons.AutoMirrored.Filled.DriveFileMove,
-                            label = "变更分组",
+                        val onDark = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White,
+                            disabledContentColor = Color.White.copy(alpha = 0.35f)
+                        )
+                        HintIconButton(
+                            icon = Icons.AutoMirrored.Outlined.DriveFileMove,
+                            hint = "移到其他分组",
                             enabled = enabled,
                             onClick = {
                                 movingPhotoIds = selectedPhotoIds.toList()
                                 showMoveProjectDialog = true
                             },
-                            modifier = Modifier.weight(1f)
+                            colors = onDark
                         )
-                        SelectionActionButton(
-                            icon = Icons.Default.Share,
-                            label = "分享",
+                        HintIconButton(
+                            icon = Icons.Outlined.Share,
+                            hint = "分享",
                             enabled = enabled,
                             onClick = { sharePhotosByIds(selectedPhotoIds) },
-                            modifier = Modifier.weight(1f)
+                            colors = onDark
                         )
-                        SelectionActionButton(
-                            icon = Icons.Default.Delete,
-                            label = "删除",
+                        HintIconButton(
+                            icon = Icons.Outlined.Delete,
+                            hint = "删除",
                             enabled = enabled,
-                            destructive = true,
                             onClick = {
                                 deletingPhotoIds = selectedPhotoIds.toList()
                                 showDeletePhotosConfirmDialog = true
                             },
-                            modifier = Modifier.weight(1f)
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = Color(0xFFFF8A80),
+                                disabledContentColor = Color.White.copy(alpha = 0.35f)
+                            )
                         )
                     }
                 }
@@ -412,148 +487,59 @@ fun ProjectDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .padding(32.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = CircleShape,
-                        modifier = Modifier.size(72.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.CameraAlt,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(34.dp)
-                            )
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "该分组还没有归档照片",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "点右下角“拍入此分组”开始拍照",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
-                }
+                Icon(
+                    Icons.Outlined.PhotoCamera,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.35f),
+                    modifier = Modifier.size(96.dp)
+                )
             }
-        } else {
-            Column(
+        } else if (filteredPhotos.isEmpty()) {
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(top = innerPadding.calculateTopPadding())
+                    .padding(innerPadding)
             ) {
-                // Search & helper hint bar
-                OutlinedTextField(
-                    value = searchQuery,
-                    onValueChange = { searchQuery = it },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    placeholder = {
-                        Text("搜索备注关键词（如 302、投影仪）…")
-                    },
-                    leadingIcon = {
-                        Icon(Icons.Default.Search, contentDescription = null)
-                    },
-                    trailingIcon = {
-                        if (searchQuery.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(Icons.Default.Clear, contentDescription = "清除搜索")
+                Icon(
+                    Icons.Outlined.SearchOff,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f),
+                    modifier = Modifier.size(80.dp)
+                )
+            }
+        } else {
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(3),
+                contentPadding = PaddingValues(
+                    start = 3.dp,
+                    end = 3.dp,
+                    top = innerPadding.calculateTopPadding() + 2.dp,
+                    bottom = innerPadding.calculateBottomPadding() + 96.dp
+                ),
+                horizontalArrangement = Arrangement.spacedBy(3.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                items(filteredPhotos, key = { it.id }) { photo ->
+                    PhotoGridCell(
+                        photo = photo,
+                        selectionMode = selectionMode,
+                        isSelected = photo.id in selectedPhotoIds,
+                        onClick = {
+                            if (selectionMode) togglePhotoSelection(photo.id) else selectedPhoto = photo
+                        },
+                        onLongClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            if (!selectionMode) {
+                                selectionMode = true
+                                selectedPhotoIds = setOf(photo.id)
+                            } else {
+                                togglePhotoSelection(photo.id)
                             }
                         }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 2.dp)
-                ) {
-                    Text(
-                        text = if (searchQuery.isBlank()) {
-                            "长按照片可多选"
-                        } else {
-                            "搜索到 ${filteredPhotos.size} / ${photos.size} 张照片"
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (!selectionMode && filteredPhotos.isNotEmpty()) {
-                        TextButton(
-                            onClick = {
-                                selectionMode = true
-                                selectedPhotoIds = emptySet()
-                            },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(28.dp)
-                        ) {
-                            Text("批量移组", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-
-                if (filteredPhotos.isEmpty()) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(24.dp)
-                    ) {
-                        Text(
-                            text = "没有包含“$searchQuery”的照片备注",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                } else {
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
-                        contentPadding = PaddingValues(
-                            start = 12.dp,
-                            end = 12.dp,
-                            top = 6.dp,
-                            bottom = innerPadding.calculateBottomPadding() + 88.dp
-                        ),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(filteredPhotos, key = { it.id }) { photo ->
-                            val isSelected = photo.id in selectedPhotoIds
-                            PhotoGridCard(
-                                photo = photo,
-                                selectionMode = selectionMode,
-                                isSelected = isSelected,
-                                onClick = {
-                                    if (selectionMode) {
-                                        togglePhotoSelection(photo.id)
-                                    } else {
-                                        selectedPhoto = photo
-                                    }
-                                },
-                                onLongClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    if (!selectionMode) {
-                                        selectionMode = true
-                                        selectedPhotoIds = setOf(photo.id)
-                                    } else {
-                                        togglePhotoSelection(photo.id)
-                                    }
-                                }
-                            )
-                        }
-                    }
                 }
             }
         }
@@ -596,16 +582,10 @@ fun ProjectDetailScreen(
                             modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ZoomIn,
-                                contentDescription = null,
+                                imageVector = Icons.Outlined.ZoomOutMap,
+                                contentDescription = "全屏",
                                 tint = Color.White,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "点击全屏放大",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                     }
@@ -613,79 +593,56 @@ fun ProjectDetailScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                Text(
-                    text = photo.note.ifEmpty { "（未填写语音备注）" },
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "文件名：${photo.fileName}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Medium
-                )
-                Text(
-                    text = "归档目录：${photo.relativePath}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                if (photo.note.isNotBlank()) {
+                    Text(
+                        text = photo.note,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
                 val formattedTime = remember(photo.capturedAt) {
                     DISPLAY_TIME_FMT.format(
                         Instant.ofEpochMilli(photo.capturedAt).atZone(ZoneId.systemDefault())
                     )
                 }
                 Text(
-                    text = "时间：$formattedTime · ${photo.width}×${photo.height} · ${CaptureSource.fromWireValue(photo.source).label}",
+                    text = formattedTime,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Primary Action: Move Project Group!
-                Button(
-                    onClick = {
-                        movingPhotoIds = listOf(photo.id)
-                        showMoveProjectDialog = true
-                    },
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.DriveFileMove,
-                        contentDescription = null,
-                        modifier = Modifier.size(19.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "变更所属项目分组（当前：${project?.name ?: "默认项目"}）",
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    FilledTonalButton(
+                    val tonal = IconButtonDefaults.filledTonalIconButtonColors()
+                    HintIconButton(
+                        icon = Icons.AutoMirrored.Outlined.DriveFileMove,
+                        hint = "移到其他分组",
+                        colors = tonal,
+                        onClick = {
+                            movingPhotoIds = listOf(photo.id)
+                            showMoveProjectDialog = true
+                        },
+                        modifier = Modifier.size(52.dp)
+                    )
+                    HintIconButton(
+                        icon = Icons.Outlined.Edit,
+                        hint = "改备注",
+                        colors = tonal,
                         onClick = {
                             editingNoteText = photo.note
                             showEditNoteDialog = true
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("改备注/文件名", maxLines = 1)
-                    }
-
-                    FilledTonalButton(
+                        modifier = Modifier.size(52.dp)
+                    )
+                    HintIconButton(
+                        icon = Icons.Outlined.Info,
+                        hint = "照片信息",
+                        colors = tonal,
                         onClick = {
                             isLoadingMetadata = true
                             showMetadataDialog = true
@@ -694,48 +651,28 @@ fun ProjectDetailScreen(
                                 isLoadingMetadata = false
                             }
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("照片信息", maxLines = 1)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    OutlinedButton(
+                        modifier = Modifier.size(52.dp)
+                    )
+                    HintIconButton(
+                        icon = Icons.Outlined.Share,
+                        hint = "分享",
+                        colors = tonal,
                         onClick = { sharePhotosByIds(listOf(photo.id)) },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(17.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("分享照片", maxLines = 1)
-                    }
-
-                    OutlinedButton(
+                        modifier = Modifier.size(52.dp)
+                    )
+                    HintIconButton(
+                        icon = Icons.Outlined.Delete,
+                        hint = "删除",
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
                         onClick = {
                             deletingPhotoIds = listOf(photo.id)
                             showDeletePhotosConfirmDialog = true
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Icon(
-                            Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("删除照片", color = MaterialTheme.colorScheme.error, maxLines = 1)
-                    }
+                        modifier = Modifier.size(52.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -1278,7 +1215,7 @@ private fun MovePhotosProjectDialog(
 }
 
 @Composable
-private fun FullScreenZoomablePhotoDialog(
+fun FullScreenZoomablePhotoDialog(
     photo: PhotoRecord,
     onDismiss: () -> Unit
 ) {
@@ -1378,86 +1315,60 @@ private fun FullScreenZoomablePhotoDialog(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun PhotoGridCard(
+private fun PhotoGridCell(
     photo: PhotoRecord,
     selectionMode: Boolean,
     isSelected: Boolean,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
-    Card(
-        shape = RoundedCornerShape(16.dp),
-        border = if (isSelected) {
-            BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            null
-        },
+    val inset by animateDpAsState(if (isSelected) 8.dp else 0.dp, label = "inset")
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onLongClick
-            )
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(3.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
-        Column {
+        AsyncImage(
+            model = photo.mediaUri,
+            contentDescription = photo.note,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inset)
+                .clip(RoundedCornerShape(if (isSelected) 10.dp else 0.dp))
+        )
+        if (selectionMode) {
             Box(
+                contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.25f))
+                    .border(2.dp, Color.White, CircleShape)
             ) {
-                AsyncImage(
-                    model = photo.mediaUri,
-                    contentDescription = photo.note,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                if (selectionMode) {
-                    Box(
-                        modifier = Modifier
-                            .align(Alignment.TopEnd)
-                            .padding(8.dp)
-                            .size(26.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (isSelected) MaterialTheme.colorScheme.primary
-                                else Color.Black.copy(alpha = 0.45f)
-                            )
-                            .border(1.5.dp, Color.White, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (isSelected) {
-                            Icon(
-                                imageVector = Icons.Default.Check,
-                                contentDescription = "已选中",
-                                tint = MaterialTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
+                if (isSelected) {
+                    Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
                 }
             }
-
-            Column(modifier = Modifier.padding(10.dp)) {
-                Text(
-                    text = photo.note.ifEmpty { "未填写备注" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = photo.fileName,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
         }
+    }
+}
+
+@Composable
+private fun CountPill(count: Int, container: Color = MaterialTheme.colorScheme.primary, content: Color = Color.White) {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(container)
+            .padding(horizontal = 10.dp, vertical = 3.dp)
+    ) {
+        Text(text = count.toString(), color = content, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
     }
 }
 
@@ -1480,43 +1391,6 @@ private fun MetadataSection(label: String, value: String) {
                 text = value,
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(8.dp)
-            )
-        }
-    }
-}
-
-@Composable
-private fun SelectionActionButton(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    enabled: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    emphasized: Boolean = false,
-    destructive: Boolean = false
-) {
-    val tint = when {
-        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        destructive -> MaterialTheme.colorScheme.error
-        emphasized -> MaterialTheme.colorScheme.primary
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-    TextButton(
-        onClick = onClick,
-        enabled = enabled,
-        shape = RoundedCornerShape(12.dp),
-        contentPadding = PaddingValues(vertical = 6.dp, horizontal = 2.dp),
-        modifier = modifier
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = label,
-                color = tint,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
-                maxLines = 1
             )
         }
     }

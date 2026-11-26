@@ -2,6 +2,8 @@ package com.stamper.app.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
@@ -21,7 +23,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.stamperDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "stamper_settings"
+    name = "stamper_settings",
+    // A half-written file (e.g. power loss) must not brick the app: fall back to defaults.
+    corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() }
 )
 
 class SettingsRepository(private val appContext: Context) {

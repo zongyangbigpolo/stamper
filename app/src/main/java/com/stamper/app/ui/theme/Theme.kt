@@ -11,6 +11,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 
+object StamperPalette {
+    val Gold = Color(0xFFFFBA38)
+    val GoldInk = Color(0xFF3A2A00)
+    val Ink = Color(0xFF1F2522)
+}
+
 private val LightColors = lightColorScheme(
     primary = Color(0xFF0F6B58),
     onPrimary = Color.White,
@@ -24,7 +30,7 @@ private val LightColors = lightColorScheme(
     onTertiary = Color.White,
     tertiaryContainer = Color(0xFFC2E8FD),
     onTertiaryContainer = Color(0xFF001F2B),
-    background = Color(0xFFF5F7F6),
+    background = Color(0xFFF6F4EE),
     onBackground = Color(0xFF171D1B),
     surface = Color.White,
     onSurface = Color(0xFF171D1B),

@@ -43,6 +43,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.NoPhotography
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.FlashAuto
@@ -233,20 +237,24 @@ fun CameraScreen(
                     .fillMaxSize()
                     .padding(32.dp)
             ) {
-                Text(
-                    text = "需要相机权限以拍摄施工现场照片",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                Button(
-                    onClick = {
-                        permLauncher.launch(
-                            arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
-                        )
-                    }
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(CircleShape)
+                        .background(com.stamper.app.ui.theme.StamperPalette.Gold)
+                        .clickable {
+                            permLauncher.launch(
+                                arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+                            )
+                        }
                 ) {
-                    Text("授予相机与麦克风权限")
+                    Icon(
+                        Icons.Default.NoPhotography,
+                        contentDescription = "授予相机权限",
+                        tint = com.stamper.app.ui.theme.StamperPalette.GoldInk,
+                        modifier = Modifier.size(40.dp)
+                    )
                 }
             }
         } else {
@@ -349,15 +357,15 @@ fun CameraScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.CreateNewFolder,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(com.stamper.app.ui.theme.StamperPalette.Gold)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "分组：${activeProject?.name ?: "默认项目"} ▾",
+                        text = activeProject?.name.orEmpty(),
                         color = Color.White,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Medium,
@@ -625,7 +633,7 @@ fun CameraScreen(
     if (showProjectSwitcherDialog) {
         AlertDialog(
             onDismissRequest = { showProjectSwitcherDialog = false },
-            title = { Text("切换或新建归档分组") },
+            icon = { Icon(Icons.Default.Folder, contentDescription = null) },
             text = {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -634,11 +642,6 @@ fun CameraScreen(
                         .heightIn(max = 340.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        text = "点击切换当前拍照归档分组：",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     FlowRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -652,7 +655,7 @@ fun CameraScreen(
                                     }
                                     showProjectSwitcherDialog = false
                                 },
-                                label = { Text("${proj.name} (${proj.photoCount})") }
+                                label = { Text(proj.name) }
                             )
                         }
                     }
@@ -660,23 +663,19 @@ fun CameraScreen(
                         value = newProjectFolderName,
                         onValueChange = { newProjectFolderName = it },
                         singleLine = true,
-                        label = { Text("新建项目名（如：教学楼3层弱电）") },
+                        leadingIcon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null) },
+                        placeholder = { Text("分组名") },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             },
             confirmButton = {
-                Button(
+                FilledIconButton(
                     onClick = {
                         val clean = newProjectFolderName.trim()
                         if (clean.isNotEmpty()) {
                             scope.launch {
-                                val created = repository.createAndSelectProject(clean)
-                                Toast.makeText(
-                                    context,
-                                    "已新建并切换到: ${created.name}",
-                                    Toast.LENGTH_SHORT
-                                ).show()
+                                repository.createAndSelectProject(clean)
                             }
                             newProjectFolderName = ""
                             showProjectSwitcherDialog = false
@@ -684,14 +683,12 @@ fun CameraScreen(
                     },
                     enabled = newProjectFolderName.isNotBlank()
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("新建并启用")
+                    Icon(Icons.Default.Check, contentDescription = "新建并启用")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showProjectSwitcherDialog = false }) {
-                    Text("关闭")
+                IconButton(onClick = { showProjectSwitcherDialog = false }) {
+                    Icon(Icons.Default.Close, contentDescription = "关闭")
                 }
             }
         )

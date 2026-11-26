@@ -477,6 +477,11 @@ class StamperRepository(
         return listOfNotNull(region.ifBlank { null }, place).joinToString("·")
     }
 
+    suspend fun searchPhotos(query: String): List<PhotoRecord> = withContext(Dispatchers.IO) {
+        val q = query.trim()
+        if (q.isEmpty()) emptyList() else database.searchPhotos(q)
+    }
+
     suspend fun inspectMetadata(photoRecord: PhotoRecord): PhotoMetadataInspection =
         StamperEngine.inspectPhotoMetadata(appContext, Uri.parse(photoRecord.mediaUri))
 

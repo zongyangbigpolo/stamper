@@ -1,5 +1,17 @@
 package com.stamper.app.ui.project
 
+import androidx.compose.material.icons.outlined.Approval
+import androidx.compose.material.icons.outlined.FormatSize
+import androidx.compose.material.icons.outlined.Place
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Sell
+import androidx.compose.material.icons.outlined.Title
+import androidx.compose.material.icons.outlined.WaterDrop
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.stamper.app.ui.components.HintIconButton
+import com.stamper.app.ui.components.WithHint
+import com.stamper.app.ui.theme.StamperPalette
 import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
@@ -8,6 +20,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -138,16 +153,22 @@ fun BatchWatermarkDialog(
         scaleSlider = style.scale
     }
 
+    // The dialog window already sits below the status bar but doesn't report the navigation bar.
+    val systemBars = WindowInsets.systemBars.asPaddingValues()
+
     Dialog(
         onDismissRequest = { if (!isRunning) onDismiss() },
-        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnClickOutside = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnClickOutside = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
+                    .padding(bottom = systemBars.calculateBottomPadding())
                     .imePadding()
             ) {
                 Row(
@@ -156,18 +177,15 @@ fun BatchWatermarkDialog(
                         .fillMaxWidth()
                         .padding(horizontal = 4.dp, vertical = 4.dp)
                 ) {
-                    IconButton(onClick = onDismiss, enabled = !isRunning) {
-                        Icon(Icons.Default.Close, contentDescription = "关闭")
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("批量添加信息水印", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(
-                            text = "${photos.size} 张 · 另存到 ${project.folderName}/${PhotoStorageManager.WATERMARK_SUBFOLDER}/，原图不变",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    HintIconButton(icon = Icons.Default.Close, hint = "关闭", onClick = onDismiss, enabled = !isRunning)
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(14.dp))
+                            .background(StamperPalette.Gold)
+                            .padding(horizontal = 10.dp, vertical = 3.dp)
+                    ) {
+                        Text(photos.size.toString(), color = StamperPalette.GoldInk, fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -232,7 +250,8 @@ fun BatchWatermarkDialog(
                     OutlinedTextField(
                         value = title,
                         onValueChange = { title = it },
-                        label = { Text("标题（蓝色栏，默认项目名）") },
+                        leadingIcon = { Icon(Icons.Outlined.Title, contentDescription = "标题") },
+                        shape = RoundedCornerShape(14.dp),
                         maxLines = 2,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -240,7 +259,8 @@ fun BatchWatermarkDialog(
                     OutlinedTextField(
                         value = style.location,
                         onValueChange = { style = style.copy(location = it) },
-                        label = { Text("地点（如：马鞍山市花山区·绿地臻城）") },
+                        leadingIcon = { Icon(Icons.Outlined.Place, contentDescription = "地点") },
+                        shape = RoundedCornerShape(14.dp),
                         singleLine = true,
                         trailingIcon = {
                             IconButton(
@@ -276,58 +296,37 @@ fun BatchWatermarkDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
 
-                    SectionLabel("显示内容")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        FilterChip(
-                            selected = style.showTime,
-                            onClick = { style = style.copy(showTime = !style.showTime) },
-                            label = { Text(InfoCard.LABEL_TIME) }
-                        )
-                        FilterChip(
-                            selected = style.showContent,
-                            onClick = { style = style.copy(showContent = !style.showContent) },
-                            label = { Text("${InfoCard.LABEL_CONTENT}（照片名称）") }
-                        )
-                        FilterChip(
-                            selected = style.showLocation,
-                            onClick = { style = style.copy(showLocation = !style.showLocation) },
-                            label = { Text(InfoCard.LABEL_LOCATION) }
-                        )
-                    }
-
-                    SectionLabel("位置")
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                        IconToggle(Icons.Outlined.Schedule, InfoCard.LABEL_TIME, style.showTime) {
+                            style = style.copy(showTime = !style.showTime)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconToggle(Icons.Outlined.Sell, InfoCard.LABEL_CONTENT, style.showContent) {
+                            style = style.copy(showContent = !style.showContent)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconToggle(Icons.Outlined.Place, InfoCard.LABEL_LOCATION, style.showLocation) {
+                            style = style.copy(showLocation = !style.showLocation)
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
                         listOf(
                             CardPosition.TOP_LEFT,
                             CardPosition.TOP_RIGHT,
                             CardPosition.BOTTOM_LEFT,
                             CardPosition.BOTTOM_RIGHT
                         ).forEach { pos ->
-                            FilterChip(
-                                selected = style.position == pos,
-                                onClick = { style = style.copy(position = pos) },
-                                label = { Text(pos.label) }
-                            )
+                            CornerPicker(pos, selected = style.position == pos) { style = style.copy(position = pos) }
+                            Spacer(modifier = Modifier.width(4.dp))
                         }
                     }
 
-                    SectionLabel("透明度 ${(opacitySlider * 100).roundToInt()}%")
-                    Slider(
-                        value = opacitySlider,
-                        onValueChange = { opacitySlider = it },
-                        onValueChangeFinished = { style = style.copy(opacity = opacitySlider) },
-                        valueRange = 0.3f..1f
-                    )
+                    SliderRow(Icons.Outlined.WaterDrop, "透明度", opacitySlider, 0.3f..1f,
+                        onChange = { opacitySlider = it },
+                        onDone = { style = style.copy(opacity = opacitySlider) })
+                    SliderRow(Icons.Outlined.FormatSize, "大小", scaleSlider, 0.6f..1.6f,
+                        onChange = { scaleSlider = it },
+                        onDone = { style = style.copy(scale = scaleSlider) })
 
-                    SectionLabel("大小 ${(scaleSlider * 100).roundToInt()}%")
-                    Slider(
-                        value = scaleSlider,
-                        onValueChange = { scaleSlider = it },
-                        onValueChangeFinished = { style = style.copy(scale = scaleSlider) },
-                        valueRange = 0.6f..1.6f
-                    )
-
-                    SectionLabel("标题栏颜色")
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         CardHeaderColor.entries.forEach { color ->
                             val selected = style.headerColor == color
@@ -388,14 +387,18 @@ fun BatchWatermarkDialog(
                                 }
                             }
                         },
-                        shape = RoundedCornerShape(14.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = StamperPalette.Gold, contentColor = StamperPalette.GoldInk),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .height(56.dp)
                     ) {
+                        Icon(Icons.Outlined.Approval, contentDescription = "生成水印照片", modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isRunning) "正在生成 $progressDone / ${photos.size}…" else "生成 ${photos.size} 张水印照片",
-                            fontWeight = FontWeight.SemiBold
+                            text = if (isRunning) "$progressDone / ${photos.size}" else photos.size.toString(),
+                            fontWeight = FontWeight.ExtraBold,
+                            style = MaterialTheme.typography.titleMedium
                         )
                     }
                 }
@@ -405,12 +408,84 @@ fun BatchWatermarkDialog(
 }
 
 @Composable
-private fun SectionLabel(text: String) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.width(320.dp)
-    )
+private fun IconToggle(icon: ImageVector, hint: String, on: Boolean, onToggle: () -> Unit) {
+    WithHint(hint) {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .size(width = 44.dp, height = 40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant)
+                .clickable(onClick = onToggle)
+        ) {
+            Icon(
+                icon,
+                contentDescription = hint,
+                tint = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+/** A tiny photo frame with a filled block in the chosen corner. */
+@Composable
+private fun CornerPicker(position: CardPosition, selected: Boolean, onClick: () -> Unit) {
+    val accent = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    WithHint(position.label) {
+        Box(
+            modifier = Modifier
+                .size(width = 34.dp, height = 40.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .border(if (selected) 2.dp else 1.dp, accent, RoundedCornerShape(8.dp))
+                .clickable(onClick = onClick)
+                .padding(5.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .align(
+                        when (position) {
+                            CardPosition.TOP_LEFT -> Alignment.TopStart
+                            CardPosition.TOP_RIGHT -> Alignment.TopEnd
+                            CardPosition.BOTTOM_LEFT -> Alignment.BottomStart
+                            CardPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
+                        }
+                    )
+                    .size(width = 11.dp, height = 8.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(accent)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SliderRow(
+    icon: ImageVector,
+    hint: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Float) -> Unit,
+    onDone: () -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        WithHint(hint) {
+            Icon(icon, contentDescription = hint, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            onValueChangeFinished = onDone,
+            valueRange = range,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = "${(value * 100).roundToInt()}%",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(40.dp)
+        )
+    }
 }

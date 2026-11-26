@@ -12,7 +12,9 @@ data class ProjectItem(
     val folderName: String,
     val createdAt: Long,
     val photoCount: Int = 0,
-    val latestCoverUri: String? = null
+    val latestCoverUri: String? = null,
+    /** Up to four most recent photo URIs, newest first, for the home mosaic. */
+    val coverUris: List<String> = emptyList()
 )
 
 data class PhotoRecord(
@@ -119,6 +121,32 @@ class StamperDatabase(context: Context) :
                     )
                 )
             }
+        }
+        return list.map { it.copy(coverUris = recentMediaUris(db, it.id, 4)) }
+    }
+
+    private fun recentMediaUris(db: SQLiteDatabase, projectId: Long, limit: Int): List<String> {
+        val uris = mutableListOf<String>()
+        db.rawQuery(
+            "SELECT media_uri FROM photo_records WHERE project_id = ? ORDER BY captured_at DESC, id DESC LIMIT $limit",
+            arrayOf(projectId.toString())
+        ).use { c ->
+            while (c.moveToNext()) uris.add(c.getString(0))
+        }
+        return uris
+    }
+
+    /** Photos across all projects whose note or file name contains [query], newest first. */
+    fun searchPhotos(query: String, limit: Int = 300): List<PhotoRecord> {
+        val like = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        val list = mutableListOf<PhotoRecord>()
+        readableDatabase.rawQuery(
+            "SELECT id, project_id, file_name, media_uri, relative_path, note, captured_at, width, height, " +
+                "watermark_applied, exif_applied, source FROM photo_records WHERE note LIKE ? ESCAPE '\\' OR file_name LIKE ? ESCAPE '\\' " +
+                "ORDER BY captured_at DESC, id DESC LIMIT $limit",
+            arrayOf(like, like)
+        ).use { c ->
+            while (c.moveToNext()) list.add(readPhotoRecord(c))
         }
         return list
     }

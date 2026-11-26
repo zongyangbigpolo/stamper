@@ -1,68 +1,54 @@
 package com.stamper.app.ui.home
 
-import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CameraAlt
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.CreateNewFolder
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.FolderZip
-import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PhotoLibrary
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,500 +58,249 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
+import com.stamper.app.R
 import com.stamper.app.data.ProjectItem
 import com.stamper.app.data.StamperRepository
-import com.stamper.app.domain.stamper.StamperSettings
+import com.stamper.app.ui.components.HintIconButton
+import com.stamper.app.ui.components.WithHint
+import com.stamper.app.ui.theme.StamperPalette
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun HomeScreen(
     repository: StamperRepository,
     onOpenCamera: () -> Unit,
     onOpenProject: (Long) -> Unit,
     onOpenSettings: () -> Unit,
-    onImportUrisSelected: (List<Uri>) -> Unit,
-    onExportProjectZip: (ProjectItem) -> Unit
+    onOpenSearch: () -> Unit,
+    onImportUrisSelected: (List<Uri>) -> Unit
 ) {
-    val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
 
     val projects by repository.projects.collectAsState()
     val activeProjectId by repository.settingsRepository.activeProjectIdFlow.collectAsState(initial = 1L)
-    val settings by repository.settingsRepository.settingsFlow.collectAsState(initial = StamperSettings())
+    val activeId = projects.firstOrNull { it.id == activeProjectId }?.id ?: projects.firstOrNull()?.id
 
-    var showCreateProjectDialog by remember { mutableStateOf(false) }
-    var showQuickSwitchDialog by remember { mutableStateOf(false) }
-    var newProjectName by remember { mutableStateOf("") }
+    var showCreateDialog by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(maxItems = 30)
-    ) { uris ->
-        if (uris.isNotEmpty()) {
-            onImportUrisSelected(uris)
-        }
+    ) { uris -> if (uris.isNotEmpty()) onImportUrisSelected(uris) }
+
+    fun setActive(id: Long) {
+        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+        scope.launch { repository.settingsRepository.setActiveProjectId(id) }
     }
 
-    val activeProject = projects.firstOrNull { it.id == activeProjectId } ?: projects.firstOrNull()
-    val totalPhotos = remember(projects) { projects.sumOf { it.photoCount } }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Stamper", fontWeight = FontWeight.ExtraBold)
-                        Text(
-                            text = "v${appVersionName(LocalContext.current)} · 共 ${projects.size} 个分组 · 已归档 $totalPhotos 张",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                },
-                actions = {
-                    FilledTonalButton(
-                        onClick = {
-                            newProjectName = ""
-                            showCreateProjectDialog = true
-                        },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.CreateNewFolder,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("新建分组")
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "水印与元数据设置")
-                    }
-                }
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 140.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .statusBarsPadding()
         ) {
-            // 1. Primary Capture Hero Card
-            item {
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    ),
-                    shape = RoundedCornerShape(22.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = "现场配件语音打标采集",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Surface(
-                                onClick = { showQuickSwitchDialog = true },
-                                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
-                                shape = RoundedCornerShape(16.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Folder,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "${activeProject?.name ?: "默认项目"} ▾",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = "拍完说一句位置（如“302教室投影仪”），自动命名归档",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
-                        )
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Button(
-                                onClick = onOpenCamera,
-                                modifier = Modifier
-                                    .weight(1.25f)
-                                    .height(50.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(20.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("连拍语音录入", fontWeight = FontWeight.SemiBold, maxLines = 1)
-                            }
-
-                            FilledTonalButton(
-                                onClick = {
-                                    photoPickerLauncher.launch(
-                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                    )
-                                },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .height(50.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp),
-                                shape = RoundedCornerShape(14.dp)
-                            ) {
-                                Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("相册补录", maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 2. Projects Header
-            item {
+            item(span = { GridItemSpan(2) }) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp, bottom = 4.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "项目归档分组",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "点卡片查看照片",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(13.dp))
+                            .background(MaterialTheme.colorScheme.primary)
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_launcher_foreground),
+                            contentDescription = null,
+                            tint = Color.Unspecified,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .scale(1.45f)
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    FilledTonalButton(
-                        onClick = {
-                            newProjectName = ""
-                            showCreateProjectDialog = true
-                        },
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("新建分组")
+                    Spacer(modifier = Modifier.weight(1f))
+                    Surface(shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 1.dp) {
+                        HintIconButton(icon = Icons.Outlined.Tune, hint = "设置", onClick = onOpenSettings)
                     }
                 }
             }
 
-            // 4. Project Cards
             items(projects, key = { it.id }) { project ->
-                val isSelected = project.id == activeProject?.id
-                ProjectCard(
+                GroupTile(
                     project = project,
-                    isActive = isSelected,
-                    onClick = {
-                        // Opening a project browses/manages photos without hijacking active capture group
-                        onOpenProject(project.id)
-                    },
-                    onShootIntoProject = {
-                        scope.launch {
-                            repository.settingsRepository.setActiveProjectId(project.id)
-                        }
-                        onOpenCamera()
-                    },
-                    onSetActive = {
-                        scope.launch {
-                            repository.settingsRepository.setActiveProjectId(project.id)
-                        }
-                    },
-                    onExportZip = { onExportProjectZip(project) }
+                    isActive = project.id == activeId,
+                    onOpen = { onOpenProject(project.id) },
+                    onSetActive = { setActive(project.id) },
+                    onShoot = onOpenCamera
+                )
+            }
+
+            item(key = "add") {
+                AddGroupTile(onClick = { showCreateDialog = true })
+            }
+        }
+
+        BottomDock(
+            onImport = {
+                photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            },
+            onShoot = onOpenCamera,
+            onSearch = onOpenSearch,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+        )
+    }
+
+    if (showCreateDialog) {
+        CreateGroupDialog(
+            onDismiss = { showCreateDialog = false },
+            onCreate = { name ->
+                showCreateDialog = false
+                scope.launch { repository.createAndSelectProject(name) }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun GroupTile(
+    project: ProjectItem,
+    isActive: Boolean,
+    onOpen: () -> Unit,
+    onSetActive: () -> Unit,
+    onShoot: () -> Unit
+) {
+    val ring by animateDpAsState(if (isActive) 3.dp else 0.dp, label = "ring")
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f / 1.12f)
+            .shadow(if (isActive) 10.dp else 3.dp, RoundedCornerShape(22.dp), ambientColor = StamperPalette.Gold, spotColor = if (isActive) StamperPalette.Gold else Color.Black)
+            .clip(RoundedCornerShape(22.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(ring, StamperPalette.Gold, RoundedCornerShape(22.dp))
+            .combinedClickable(onClick = onOpen, onLongClick = onSetActive)
+            .padding(6.dp)
+    ) {
+        CoverMosaic(uris = project.coverUris, modifier = Modifier.fillMaxSize())
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(bottomStart = 17.dp, bottomEnd = 17.dp))
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))))
+                .padding(start = 8.dp, end = 8.dp, top = 22.dp, bottom = 8.dp)
+        ) {
+            Text(
+                text = project.name,
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Icon(Icons.Outlined.PhotoLibrary, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = project.photoCount.toString(),
+                    color = Color.White,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
-    }
 
-    if (showQuickSwitchDialog) {
-        AlertDialog(
-            onDismissRequest = { showQuickSwitchDialog = false },
-            title = { Text("切换当前拍照归档分组") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text(
-                        text = "新照片存入所选分组：",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    FlowRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        projects.forEach { proj ->
-                            FilterChip(
-                                selected = proj.id == activeProject?.id,
-                                onClick = {
-                                    scope.launch {
-                                        repository.settingsRepository.setActiveProjectId(proj.id)
-                                    }
-                                    showQuickSwitchDialog = false
-                                },
-                                label = { Text("${proj.name} (${proj.photoCount})") }
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                FilledTonalButton(
-                    onClick = {
-                        showQuickSwitchDialog = false
-                        newProjectName = ""
-                        showCreateProjectDialog = true
-                    }
+        if (isActive) {
+            Box(modifier = Modifier.align(Alignment.TopEnd)) {
+            WithHint("拍入此组") {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .size(32.dp)
+                        .shadow(4.dp, CircleShape)
+                        .clip(CircleShape)
+                        .background(StamperPalette.Gold)
+                        .clickable(onClick = onShoot)
                 ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("新建项目分组")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showQuickSwitchDialog = false }) {
-                    Text("关闭")
+                    Icon(Icons.Outlined.PhotoCamera, contentDescription = "拍入此组", tint = StamperPalette.GoldInk, modifier = Modifier.size(18.dp))
                 }
             }
-        )
-    }
-
-    if (showCreateProjectDialog) {
-        AlertDialog(
-            onDismissRequest = { showCreateProjectDialog = false },
-            title = { Text("新建施工/归档项目分组") },
-            text = {
-                OutlinedTextField(
-                    value = newProjectName,
-                    onValueChange = { newProjectName = it },
-                    singleLine = true,
-                    label = { Text("项目名称（如：实验楼弱电安装）") },
-                    supportingText = {
-                        Text("照片保存在相册 Stamper/<分组名> 文件夹")
-                    }
-                )
-            },
-            confirmButton = {
-                Button(
-                    enabled = newProjectName.isNotBlank(),
-                    onClick = {
-                        val trimmed = newProjectName.trim()
-                        if (trimmed.isNotEmpty()) {
-                            scope.launch {
-                                repository.createAndSelectProject(trimmed)
-                            }
-                            showCreateProjectDialog = false
-                        }
-                    }
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("创建并设为当前")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showCreateProjectDialog = false }) {
-                    Text("取消")
-                }
             }
-        )
+        }
     }
 }
 
 @Composable
-private fun ProjectCard(
-    project: ProjectItem,
-    isActive: Boolean,
-    onClick: () -> Unit,
-    onShootIntoProject: () -> Unit,
-    onSetActive: () -> Unit,
-    onExportZip: () -> Unit
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(18.dp),
-        border = if (isActive) {
-            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-        } else {
-            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
-        },
-        colors = CardDefaults.cardColors(
-            containerColor = if (isActive) {
-                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
-            } else {
-                MaterialTheme.colorScheme.surface
+private fun CoverMosaic(uris: List<String>, modifier: Modifier = Modifier) {
+    val placeholder = MaterialTheme.colorScheme.surfaceVariant
+    Box(modifier = modifier.clip(RoundedCornerShape(17.dp)).background(placeholder)) {
+        when (uris.size) {
+            0 -> Icon(
+                Icons.Outlined.PhotoCamera,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(40.dp)
+            )
+            1 -> AsyncImage(model = uris[0], contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            2 -> Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.fillMaxSize()) {
+                MosaicCell(uris[0], Modifier.weight(1f))
+                MosaicCell(uris[1], Modifier.weight(1f))
             }
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = if (isActive) 2.dp else 1.dp)
-    ) {
-        Column(modifier = Modifier.padding(14.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier
-                        .size(64.dp)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                ) {
-                    if (!project.latestCoverUri.isNullOrBlank()) {
-                        AsyncImage(
-                            model = project.latestCoverUri,
-                            contentDescription = project.name,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxSize()
-                        )
-                    } else {
-                        Icon(
-                            imageVector = Icons.Default.Folder,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(30.dp)
-                        )
-                    }
+            3 -> Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.fillMaxSize()) {
+                MosaicCell(uris[0], Modifier.weight(1f))
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                    MosaicCell(uris[1], Modifier.weight(1f))
+                    MosaicCell(uris[2], Modifier.weight(1f))
                 }
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = project.name,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (isActive) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CheckCircle,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.size(13.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(3.dp))
-                                    Text(
-                                        text = "当前归档",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer
-                                    )
-                                }
-                            }
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "已归档 ${project.photoCount} 张 · Pictures/Stamper/${project.folderName}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = "查看项目照片",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                FilledTonalButton(
-                    onClick = onShootIntoProject,
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(34.dp)
-                ) {
-                    Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(15.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("拍入此组", style = MaterialTheme.typography.labelMedium)
-                }
-
-                if (!isActive) {
-                    TextButton(
-                        onClick = onSetActive,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Text("设为当前默认", style = MaterialTheme.typography.labelMedium)
-                    }
-                }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                if (project.photoCount > 0) {
-                    TextButton(
-                        onClick = onExportZip,
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(34.dp)
-                    ) {
-                        Icon(Icons.Default.FolderZip, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("导出ZIP", style = MaterialTheme.typography.labelMedium)
+            else -> Column(verticalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.fillMaxSize()) {
+                for (rowIdx in 0 until 2) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.weight(1f)) {
+                        MosaicCell(uris[rowIdx * 2], Modifier.weight(1f))
+                        MosaicCell(uris[rowIdx * 2 + 1], Modifier.weight(1f))
                     }
                 }
             }
@@ -573,6 +308,123 @@ private fun ProjectCard(
     }
 }
 
-private fun appVersionName(context: Context): String =
-    runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }
-        .getOrNull() ?: "?"
+@Composable
+private fun MosaicCell(uri: String, modifier: Modifier) {
+    AsyncImage(
+        model = uri,
+        contentDescription = null,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.fillMaxSize()
+    )
+}
+
+@Composable
+private fun AddGroupTile(onClick: () -> Unit) {
+    val dashColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.45f)
+    WithHint("新建分组") {
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1f / 1.12f)
+                .clip(RoundedCornerShape(22.dp))
+                .drawBehind {
+                    drawRoundRect(
+                        color = dashColor,
+                        cornerRadius = CornerRadius(22.dp.toPx()),
+                        style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(14f, 12f)))
+                    )
+                }
+                .clickable(onClick = onClick)
+        ) {
+            Icon(
+                Icons.Outlined.CreateNewFolder,
+                contentDescription = "新建分组",
+                tint = MaterialTheme.colorScheme.outline,
+                modifier = Modifier.size(36.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomDock(
+    onImport: () -> Unit,
+    onShoot: () -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        contentAlignment = Alignment.BottomCenter,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 22.dp, end = 22.dp, bottom = 18.dp)
+            .height(112.dp)
+    ) {
+        Surface(
+            shape = RoundedCornerShape(38.dp),
+            color = MaterialTheme.colorScheme.surface,
+            shadowElevation = 12.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(76.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.padding(horizontal = 22.dp)
+            ) {
+                HintIconButton(icon = Icons.Outlined.Image, hint = "相册补录", onClick = onImport, iconSize = 26.dp)
+                HintIconButton(icon = Icons.Outlined.Search, hint = "搜索", onClick = onSearch, iconSize = 26.dp)
+            }
+        }
+        WithHint("拍照") {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .offset(y = (-34).dp)
+                    .size(98.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surface)
+                    .padding(7.dp)
+                    .shadow(10.dp, CircleShape, spotColor = StamperPalette.Gold)
+                    .clip(CircleShape)
+                    .background(StamperPalette.Gold)
+                    .clickable(onClick = onShoot)
+            ) {
+                Icon(Icons.Outlined.PhotoCamera, contentDescription = "拍照", tint = StamperPalette.GoldInk, modifier = Modifier.size(38.dp))
+            }
+        }
+    }
+}
+
+@Composable
+fun CreateGroupDialog(onDismiss: () -> Unit, onCreate: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Outlined.CreateNewFolder, contentDescription = null) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                singleLine = true,
+                placeholder = { Text("分组名") },
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            HintIconButton(
+                icon = Icons.Rounded.Check,
+                hint = "创建",
+                enabled = name.isNotBlank(),
+                onClick = { onCreate(name.trim()) },
+                colors = IconButtonDefaults.filledIconButtonColors()
+            )
+        },
+        dismissButton = {
+            HintIconButton(icon = Icons.Rounded.Close, hint = "取消", onClick = onDismiss)
+        }
+    )
+}

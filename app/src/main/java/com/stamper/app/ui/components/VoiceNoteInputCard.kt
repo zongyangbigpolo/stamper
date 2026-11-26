@@ -1,5 +1,28 @@
 package com.stamper.app.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.outlined.CreateNewFolder
+import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.SettingsVoice
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Mic
+import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.ui.graphics.Color
+import com.stamper.app.ui.theme.StamperPalette
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.sin
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
@@ -236,18 +259,36 @@ fun VoiceNoteInputCard(
         label = "voiceLevel"
     )
 
+    fun saveNow() {
+        val mergedNote = if (speechState.partialTranscript.isNotBlank()) {
+            SystemSpeechHelper.appendRecognizedSegment(noteText, speechState.partialTranscript)
+        } else {
+            noteText.trim()
+        }
+        speechHelper.release()
+        onSave(mergedNote, selectedProject?.id ?: localSelectedProjectId)
+    }
+
+    val wave = rememberInfiniteTransition(label = "wave")
+    val phase by wave.animateFloat(
+        initialValue = 0f,
+        targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(900, easing = LinearEasing)),
+        label = "phase"
+    )
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .imePadding(),
-        shape = RoundedCornerShape(22.dp),
-        tonalElevation = 6.dp,
-        shadowElevation = 12.dp
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 16.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .heightIn(max = 480.dp)
+                .heightIn(max = 520.dp)
                 .padding(16.dp)
         ) {
             Column(
@@ -255,374 +296,268 @@ fun VoiceNoteInputCard(
                     .weight(1f, fill = false)
                     .verticalScroll(rememberScrollState())
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     if (photoUri != null) {
                         AsyncImage(
                             model = photoUri,
-                            contentDescription = "照片预览",
+                            contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(60.dp)
+                                .size(44.dp)
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(MaterialTheme.colorScheme.surfaceVariant)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                     }
-
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    WithHint("归档分组") {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .clickable { showProjectSelector = !showProjectSelector }
+                                .padding(horizontal = 12.dp, vertical = 8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .clip(CircleShape)
+                                    .background(StamperPalette.Gold)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "语音录入配件备注",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
+                                text = selectedProject?.name.orEmpty(),
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f, fill = false)
+                                modifier = Modifier.widthIn(max = 180.dp)
                             )
-                            if (!queueLabel.isNullOrBlank()) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.secondaryContainer,
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = queueLabel,
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSecondaryContainer,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                    )
-                                }
-                            }
+                            Icon(
+                                if (showProjectSelector) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        AssistChip(
-                            onClick = { showProjectSelector = !showProjectSelector },
-                            label = {
-                                Text(
-                                    text = "归档分组：${selectedProject?.name ?: "默认项目"} ▾",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Folder,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
+                    if (!queueLabel.isNullOrBlank()) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(MaterialTheme.colorScheme.secondaryContainer)
+                                .padding(horizontal = 10.dp, vertical = 3.dp)
+                        ) {
+                            Text(queueLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
 
                 if (showProjectSelector) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Surface(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth()
+                    Spacer(modifier = Modifier.height(10.dp))
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Text(
-                                text = "选择归档分组：",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                        projects.forEach { proj ->
+                            FilterChip(
+                                selected = proj.id == selectedProject?.id,
+                                onClick = {
+                                    localSelectedProjectId = proj.id
+                                    onSelectProject(proj.id)
+                                    showProjectSelector = false
+                                    showInlineCreateProject = false
+                                },
+                                label = { Text(proj.name) }
                             )
-                            Spacer(modifier = Modifier.height(6.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                projects.forEach { proj ->
-                                    FilterChip(
-                                        selected = proj.id == selectedProject?.id,
-                                        onClick = {
-                                            localSelectedProjectId = proj.id
-                                            onSelectProject(proj.id)
-                                            showProjectSelector = false
-                                            showInlineCreateProject = false
-                                        },
-                                        label = { Text(proj.name) }
-                                    )
-                                }
-                                if (onCreateProject != null) {
-                                    AssistChip(
-                                        onClick = {
-                                            inlineProjectName = ""
-                                            showInlineCreateProject = !showInlineCreateProject
-                                        },
-                                        leadingIcon = {
-                                            Icon(
-                                                imageVector = Icons.Default.CreateNewFolder,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        },
-                                        label = { Text("新建分组") }
-                                    )
-                                }
-                            }
-
-                            if (showInlineCreateProject && onCreateProject != null) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    OutlinedTextField(
-                                        value = inlineProjectName,
-                                        onValueChange = { inlineProjectName = it },
-                                        singleLine = true,
-                                        label = { Text("新项目名（如：实验楼弱电）") },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Button(
-                                        onClick = {
-                                            val clean = inlineProjectName.trim()
-                                            if (clean.isNotEmpty() && !isCreatingProject) {
-                                                isCreatingProject = true
-                                                scope.launch {
-                                                    runCatching { onCreateProject(clean) }
-                                                        .onSuccess { created ->
-                                                            localSelectedProjectId = created.id
-                                                            inlineProjectName = ""
-                                                            showInlineCreateProject = false
-                                                            showProjectSelector = false
-                                                        }
-                                                    isCreatingProject = false
-                                                }
+                        }
+                        if (onCreateProject != null) {
+                            FilterChip(
+                                selected = showInlineCreateProject,
+                                onClick = {
+                                    inlineProjectName = ""
+                                    showInlineCreateProject = !showInlineCreateProject
+                                },
+                                label = { Icon(Icons.Outlined.CreateNewFolder, contentDescription = "新建分组", modifier = Modifier.size(18.dp)) }
+                            )
+                        }
+                    }
+                    if (showInlineCreateProject && onCreateProject != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                            OutlinedTextField(
+                                value = inlineProjectName,
+                                onValueChange = { inlineProjectName = it },
+                                singleLine = true,
+                                placeholder = { Text("分组名") },
+                                shape = RoundedCornerShape(14.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            if (isCreatingProject) {
+                                CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                            } else {
+                                HintIconButton(
+                                    icon = Icons.Rounded.Check,
+                                    hint = "创建",
+                                    enabled = inlineProjectName.isNotBlank(),
+                                    colors = IconButtonDefaults.filledIconButtonColors(),
+                                    onClick = {
+                                        val clean = inlineProjectName.trim()
+                                        if (clean.isNotEmpty()) {
+                                            isCreatingProject = true
+                                            scope.launch {
+                                                runCatching { onCreateProject(clean) }
+                                                    .onSuccess { created ->
+                                                        localSelectedProjectId = created.id
+                                                        inlineProjectName = ""
+                                                        showInlineCreateProject = false
+                                                        showProjectSelector = false
+                                                    }
+                                                isCreatingProject = false
                                             }
-                                        },
-                                        enabled = inlineProjectName.isNotBlank() && !isCreatingProject,
-                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
-                                    ) {
-                                        if (isCreatingProject) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp,
-                                                color = MaterialTheme.colorScheme.onPrimary
-                                            )
-                                        } else {
-                                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            Text("创建")
                                         }
                                     }
-                                }
+                                )
                             }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                if (speechState.isListening) {
-                    LinearProgressIndicator(
-                        progress = { normalizedLevel },
-                        color = MaterialTheme.colorScheme.error,
-                        trackColor = MaterialTheme.colorScheme.errorContainer,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(5.dp)
-                            .clip(RoundedCornerShape(4.dp))
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                }
-
+                // Live waveform: bars bounce with the mic level while listening
                 Row(
+                    horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(44.dp)
                 ) {
-                    OutlinedTextField(
-                        value = noteText,
-                        onValueChange = { noteText = it },
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(14.dp),
-                        label = { Text("配件位置说明（如：302教室东南角投影仪）") },
-                        placeholder = {
-                            if (speechState.isListening) {
-                                Text(
-                                    speechState.partialTranscript.ifEmpty { "正在聆听，请直接说出配件位置…" }
+                    repeat(17) { i ->
+                        val factor = 0.35f + 0.65f * abs(sin(phase + i * 0.55f))
+                        val barHeight = if (speechState.isListening) 6.dp + 30.dp * normalizedLevel * factor else 4.dp
+                        Box(
+                            modifier = Modifier
+                                .width(4.dp)
+                                .height(barHeight)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(
+                                    if (speechState.isListening) MaterialTheme.colorScheme.primary
+                                    else MaterialTheme.colorScheme.outlineVariant
                                 )
-                            } else {
-                                Text("点击右侧麦克风口述，或直接键盘输入")
-                            }
-                        },
-                        supportingText = {
-                            if (speechState.partialTranscript.isNotEmpty()) {
-                                Text(
-                                    text = (if (speechState.isListening) "实时听写：" else "识别中：") +
-                                        speechState.partialTranscript,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            } else if (!speechState.errorMessage.isNullOrBlank()) {
-                                Text(
-                                    text = speechState.errorMessage!!,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            } else {
-                                Text(
-                                    text = "保存文件名：$previewFileName",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        },
-                        maxLines = 3,
-                        trailingIcon = {
-                            if (noteText.isNotEmpty()) {
-                                IconButton(onClick = { noteText = "" }) {
-                                    Icon(Icons.Default.Clear, contentDescription = "清空文字")
-                                }
-                            }
-                        }
-                    )
+                        )
+                    }
+                }
 
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    val micColor by animateColorAsState(
-                        targetValue = if (speechState.isListening) {
-                            MaterialTheme.colorScheme.error
+                OutlinedTextField(
+                    value = noteText,
+                    onValueChange = { noteText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    textStyle = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    placeholder = {
+                        if (speechState.partialTranscript.isNotEmpty()) {
+                            Text(speechState.partialTranscript, style = MaterialTheme.typography.titleMedium)
                         } else {
-                            MaterialTheme.colorScheme.primary
-                        },
-                        label = "micColor"
-                    )
-
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        FilledIconButton(
-                            onClick = { triggerVoiceCapture() },
-                            enabled = !isSaving,
-                            shape = CircleShape,
-                            colors = IconButtonDefaults.filledIconButtonColors(
-                                containerColor = micColor
-                            ),
-                            modifier = Modifier.size(56.dp)
-                        ) {
-                            Icon(
-                                imageVector = if (speechState.isListening) Icons.Default.Stop else Icons.Default.Mic,
-                                contentDescription = if (speechState.isListening) "停止说话" else "开始说话",
-                                modifier = Modifier.size(26.dp)
+                            Icon(Icons.Outlined.Keyboard, contentDescription = null)
+                        }
+                    },
+                    supportingText = if (noteText.isNotEmpty() && speechState.partialTranscript.isNotEmpty()) {
+                        { Text(speechState.partialTranscript, color = MaterialTheme.colorScheme.primary) }
+                    } else if (!speechState.errorMessage.isNullOrBlank()) {
+                        { Text(speechState.errorMessage!!, color = MaterialTheme.colorScheme.error) }
+                    } else {
+                        null
+                    },
+                    maxLines = 3,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        unfocusedBorderColor = Color.Transparent
+                    ),
+                    trailingIcon = {
+                        if (noteText.isNotEmpty()) {
+                            HintIconButton(icon = Icons.Rounded.Close, hint = "清空", onClick = { noteText = "" }, iconSize = 20.dp)
+                        } else if (speechState.needsVoiceSetup) {
+                            HintIconButton(
+                                icon = Icons.Outlined.SettingsVoice,
+                                hint = "语音设置",
+                                onClick = { SystemSpeechHelper.openSystemVoiceInputSettings(context) }
                             )
                         }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = if (speechState.isListening) "点击结束" else if (noteText.isEmpty()) "点此说话" else "继续追加",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = if (speechState.isListening) {
-                                MaterialTheme.colorScheme.error
-                            } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
-                            }
-                        )
                     }
-                }
-
-                if (noteText.isNotEmpty() && !speechState.isListening) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        AssistChip(
-                            onClick = {
-                                noteText = ""
-                                triggerVoiceCapture()
-                            },
-                            leadingIcon = {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(15.dp))
-                            },
-                            label = { Text("清空并重说", style = MaterialTheme.typography.labelSmall) }
-                        )
-                        AssistChip(
-                            onClick = { triggerVoiceCapture() },
-                            leadingIcon = {
-                                Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(15.dp))
-                            },
-                            label = { Text("口述追加补充", style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-
-                if (speechState.needsVoiceSetup) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    AssistChip(
-                        onClick = { SystemSpeechHelper.openSystemVoiceInputSettings(context) },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.SettingsVoice,
-                                contentDescription = null,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        },
-                        label = { Text("去系统设置开启「语音输入」引擎") }
-                    )
-                }
+                )
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                modifier = Modifier.fillMaxWidth()
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp)
             ) {
-                OutlinedButton(
+                HintIconButton(
+                    icon = Icons.Rounded.Close,
+                    hint = dismissButtonLabel,
+                    enabled = !isSaving && !isCreatingProject,
                     onClick = {
                         speechHelper.release()
                         onDismiss()
                     },
-                    enabled = !isSaving && !isCreatingProject,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(dismissButtonLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier.size(58.dp)
+                )
+
+                val micColor by animateColorAsState(
+                    targetValue = if (speechState.isListening) Color(0xFFE5484D) else MaterialTheme.colorScheme.primary,
+                    label = "micColor"
+                )
+                val halo by animateDpAsState(if (speechState.isListening) 10.dp * (0.4f + normalizedLevel) else 0.dp, label = "halo")
+                WithHint(if (speechState.isListening) "停止" else "说话") {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(92.dp)
+                            .clip(CircleShape)
+                            .background(micColor.copy(alpha = if (speechState.isListening) 0.18f else 0f))
+                            .padding(10.dp - halo / 2)
+                            .clip(CircleShape)
+                            .background(micColor)
+                            .clickable(enabled = !isSaving) { triggerVoiceCapture() }
+                    ) {
+                        Icon(
+                            imageVector = if (speechState.isListening) Icons.Rounded.Stop else Icons.Rounded.Mic,
+                            contentDescription = if (speechState.isListening) "停止" else "说话",
+                            tint = Color.White,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
                 }
 
-                Button(
-                    onClick = {
-                        val mergedNote = if (speechState.partialTranscript.isNotBlank()) {
-                            SystemSpeechHelper.appendRecognizedSegment(noteText, speechState.partialTranscript)
+                WithHint(saveButtonLabel) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(58.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary)
+                            .clickable(enabled = !isSaving && !isCreatingProject) { saveNow() }
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                strokeWidth = 2.5.dp,
+                                color = MaterialTheme.colorScheme.onPrimary
+                            )
                         } else {
-                            noteText.trim()
+                            Icon(Icons.Rounded.Check, contentDescription = saveButtonLabel, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(28.dp))
                         }
-                        speechHelper.release()
-                        val targetId = selectedProject?.id ?: localSelectedProjectId
-                        onSave(mergedNote, targetId)
-                    },
-                    enabled = !isSaving && !isCreatingProject,
-                    shape = RoundedCornerShape(14.dp),
-                    modifier = Modifier
-                        .weight(1.45f)
-                        .height(48.dp)
-                ) {
-                    if (isSaving) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.onPrimary
-                        )
-                    } else {
-                        Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
                     }
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = if (isSaving) "合成保存中…" else saveButtonLabel,
-                        fontWeight = FontWeight.SemiBold,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
                 }
             }
         }

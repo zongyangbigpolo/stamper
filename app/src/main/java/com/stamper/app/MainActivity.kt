@@ -40,6 +40,7 @@ import com.stamper.app.ui.components.VoiceNoteInputCard
 import com.stamper.app.ui.home.HomeScreen
 import com.stamper.app.ui.project.ProjectDetailScreen
 import com.stamper.app.ui.settings.SettingsScreen
+import com.stamper.app.ui.search.SearchScreen
 import com.stamper.app.ui.theme.StamperTheme
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -159,6 +160,7 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("project/$projId")
                                 },
                                 onOpenSettings = { navController.navigate("settings") },
+                                onOpenSearch = { navController.navigate("search") },
                                 onImportUrisSelected = { uris ->
                                     val now = System.currentTimeMillis()
                                     uris.forEach { uri ->
@@ -170,10 +172,14 @@ class MainActivity : ComponentActivity() {
                                             )
                                         )
                                     }
-                                },
-                                onExportProjectZip = { project ->
-                                    exportAndShareZip(project.id)
                                 }
+                            )
+                        }
+
+                        composable("search") {
+                            SearchScreen(
+                                repository = repository,
+                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
 
@@ -238,7 +244,7 @@ class MainActivity : ComponentActivity() {
                                     autoStartSpeech = settings.autoStartSpeech,
                                     isSaving = isSavingImport,
                                     queueLabel = if (importQueue.size > 1) {
-                                        "待补录 (${importQueue.size} 张)"
+                                        "${importQueue.size}"
                                     } else {
                                         null
                                     },
