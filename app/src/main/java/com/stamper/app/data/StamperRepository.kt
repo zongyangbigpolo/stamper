@@ -1,9 +1,13 @@
 package com.stamper.app.data
 
 import android.content.Context
+import android.location.Address
+import android.location.Geocoder
 import android.net.Uri
 import com.stamper.app.domain.stamper.CaptureSource
 import com.stamper.app.domain.stamper.FileNameSanitizer
+import com.stamper.app.domain.stamper.InfoCard
+import com.stamper.app.domain.stamper.InfoCardStyle
 import com.stamper.app.domain.stamper.PhotoMetadataInspection
 import com.stamper.app.domain.stamper.StamperEngine
 import com.stamper.app.domain.stamper.StamperMetadata
@@ -21,6 +25,15 @@ import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Locale
+
+data class BatchWatermarkResult(
+    val succeeded: Int,
+    val failed: Int,
+    val folderDisplayPath: String
+)
+
+data class LocationSuggestion(val text: String, val coordinatesOnly: Boolean)
 
 class StamperRepository(
     private val appContext: Context,
@@ -352,6 +365,118 @@ class StamperRepository(
         refreshProjects()
     }
 
+    /**
+     * Burns the project info card into copies of the given photos, saved under
+     * `Pictures/Stamper/<项目>/水印版/` with the original file names. Originals are untouched.
+     */
+    suspend fun renderInfoCardCopies(
+        projectId: Long,
+        photoIds: List<Long>,
+        title: String,
+        style: InfoCardStyle,
+        onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }
+    ): Result<BatchWatermarkResult> = withContext(Dispatchers.IO) {
+        runCatching {
+            val project = database.getProjectById(projectId) ?: error("项目不存在")
+            settingsRepository.saveInfoCardPreferences(projectId, title, style)
+            val quality = settingsRepository.settingsFlow.first().jpegQuality
+            val folderPath = "${project.folderName}/${PhotoStorageManager.WATERMARK_SUBFOLDER}"
+            var succeeded = 0
+            var failed = 0
+            photoIds.forEachIndexed { index, photoId ->
+                val record = database.getPhotoById(photoId)
+                val ok = record != null && runCatching {
+                    val content = InfoCard.buildContent(
+                        title = title,
+                        capturedAtMillis = record.capturedAt,
+                        note = record.note,
+                        fileName = record.fileName,
+                        style = style
+                    )
+                    val zdt = Instant.ofEpochMilli(record.capturedAt).atZone(ZoneId.systemDefault())
+                    val bytes = StamperEngine.renderInfoCardJpeg(
+                        context = appContext,
+                        sourceUri = Uri.parse(record.mediaUri),
+                        content = content,
+                        style = style,
+                        fallbackMetadata = StamperMetadata(
+                            project = project.name,
+                            capturedAt = DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(zdt),
+                            note = record.note,
+                            watermarkApplied = record.watermarkApplied,
+                            watermarkCorner = "KEEP",
+                            source = record.source
+                        ),
+                        capturedAtMillis = record.capturedAt,
+                        jpegQuality = quality
+                    )
+                    PhotoStorageManager.saveOrReplaceJpeg(
+                        context = appContext,
+                        folderPath = folderPath,
+                        fileName = record.fileName,
+                        jpegBytes = bytes,
+                        capturedAtMillis = record.capturedAt
+                    )
+                }.isSuccess
+                if (ok) succeeded++ else failed++
+                onProgress(index + 1, photoIds.size)
+            }
+            BatchWatermarkResult(
+                succeeded = succeeded,
+                failed = failed,
+                folderDisplayPath = "Pictures/${PhotoStorageManager.ROOT_FOLDER}/$folderPath"
+            )
+        }
+    }
+
+    /**
+     * Suggests a 地点 value from the first selected photo that carries GPS EXIF. Uses the
+     * platform Geocoder when the phone provides one, otherwise falls back to raw coordinates.
+     */
+    suspend fun suggestLocationFromPhotos(photoIds: List<Long>): LocationSuggestion? =
+        withContext(Dispatchers.IO) {
+            var latLng: Pair<Double, Double>? = null
+            for (photoId in photoIds) {
+                val record = database.getPhotoById(photoId) ?: continue
+                latLng = runCatching {
+                    StamperEngine.inspectPhotoMetadata(appContext, Uri.parse(record.mediaUri)).gpsLatLng
+                }.getOrNull()
+                if (latLng != null) break
+            }
+            if (latLng == null) return@withContext null
+
+            val address = if (Geocoder.isPresent()) {
+                runCatching {
+                    @Suppress("DEPRECATION")
+                    Geocoder(appContext, Locale.SIMPLIFIED_CHINESE)
+                        .getFromLocation(latLng.first, latLng.second, 1)
+                        ?.firstOrNull()
+                }.getOrNull()
+            } else {
+                null
+            }
+            val readable = address?.let { formatAddress(it) }
+            if (!readable.isNullOrBlank()) {
+                LocationSuggestion(readable, coordinatesOnly = false)
+            } else {
+                LocationSuggestion(
+                    String.format(Locale.US, "%.5f°%s, %.5f°%s",
+                        kotlin.math.abs(latLng.first), if (latLng.first >= 0) "N" else "S",
+                        kotlin.math.abs(latLng.second), if (latLng.second >= 0) "E" else "W"),
+                    coordinatesOnly = true
+                )
+            }
+        }
+
+    private fun formatAddress(address: Address): String {
+        val region = listOfNotNull(address.locality ?: address.adminArea, address.subLocality)
+            .distinct()
+            .joinToString("")
+        val place = address.featureName?.takeUnless { it.isBlank() || it.all { c -> c.isDigit() } }
+            ?: address.thoroughfare
+        return listOfNotNull(region.ifBlank { null }, place).joinToString("·")
+    }
+
     suspend fun inspectMetadata(photoRecord: PhotoRecord): PhotoMetadataInspection =
         StamperEngine.inspectPhotoMetadata(appContext, Uri.parse(photoRecord.mediaUri))
 
@@ -363,8 +488,4 @@ class StamperRepository(
             PhotoStorageManager.exportProjectToZip(appContext, project, photos)
         }
     }
-
-    fun isSystemMediaSeen(mediaId: Long): Boolean = database.isSystemMediaSeen(mediaId)
-
-    fun markSystemMediaSeen(mediaId: Long) = database.markSystemMediaSeen(mediaId)
 }

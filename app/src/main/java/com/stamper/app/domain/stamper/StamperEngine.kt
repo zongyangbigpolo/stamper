@@ -195,6 +195,82 @@ object StamperEngine {
     }
 
     /**
+     * Decodes an archived photo upright and returns a downscaled bitmap suitable for previews.
+     */
+    suspend fun decodeUprightBitmap(context: Context, uri: Uri, maxDimension: Int): Bitmap =
+        withContext(Dispatchers.IO) {
+            val accessibleUri = tryRequireOriginalUri(uri)
+            var orientation = ExifInterface.ORIENTATION_NORMAL
+            openUriWithFallback(context, accessibleUri, uri)?.use { stream ->
+                orientation = ExifInterface(stream).getAttributeInt(
+                    ExifInterface.TAG_ORIENTATION,
+                    ExifInterface.ORIENTATION_NORMAL
+                )
+            }
+            val boundsOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            openUriWithFallback(context, accessibleUri, uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, boundsOpts)
+            }
+            val decodeOpts = BitmapFactory.Options().apply {
+                inSampleSize = calculateInSampleSize(boundsOpts.outWidth, boundsOpts.outHeight, maxDimension)
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            val raw = openUriWithFallback(context, accessibleUri, uri)?.use { stream ->
+                BitmapFactory.decodeStream(stream, null, decodeOpts)
+            } ?: throw IllegalStateException("无法读取照片: $uri")
+            val upright = applyExifOrientation(raw, orientation)
+            if (upright !== raw) raw.recycle()
+            upright
+        }
+
+    /**
+     * Produces a JPEG copy of an archived photo with the project info card burned in, keeping
+     * the original EXIF (time, GPS, camera) and the Stamper EXIF/XMP metadata.
+     */
+    suspend fun renderInfoCardJpeg(
+        context: Context,
+        sourceUri: Uri,
+        content: InfoCardContent,
+        style: InfoCardStyle,
+        fallbackMetadata: StamperMetadata,
+        capturedAtMillis: Long,
+        jpegQuality: Int
+    ): ByteArray = withContext(Dispatchers.IO) {
+        val accessibleUri = tryRequireOriginalUri(sourceUri)
+        val preservedExif = mutableMapOf<String, String>()
+        var parsedMetadata: StamperMetadata? = null
+        openUriWithFallback(context, accessibleUri, sourceUri)?.use { stream ->
+            val srcExif = ExifInterface(stream)
+            for (tag in PRESERVED_EXIF_TAGS) {
+                srcExif.getAttribute(tag)?.let { preservedExif[tag] = it }
+            }
+            parsedMetadata = StamperMetadata.parseFromUserComment(
+                srcExif.getAttribute(ExifInterface.TAG_USER_COMMENT)
+            )
+        }
+
+        val upright = decodeUprightBitmap(context, sourceUri, MAX_DECODE_DIMENSION)
+        val stamped = InfoCardRenderer.render(upright, content, style)
+        upright.recycle()
+
+        val width = stamped.width
+        val height = stamped.height
+        val compressed = ByteArrayOutputStream(512 * 1024)
+        stamped.compress(Bitmap.CompressFormat.JPEG, jpegQuality.coerceIn(60, 100), compressed)
+        stamped.recycle()
+
+        writeExifAndXmpBytes(
+            context = context,
+            rawJpegBytes = compressed.toByteArray(),
+            metadata = parsedMetadata ?: fallbackMetadata,
+            capturedAtMillis = capturedAtMillis,
+            preservedExif = preservedExif,
+            imageWidth = width,
+            imageHeight = height
+        )
+    }
+
+    /**
      * Re-writes EXIF + XMP metadata on an existing JPEG when the user edits the note or moves
      * a photo between projects.
      */

@@ -7,6 +7,8 @@ import java.util.Locale
 
 object FileNameSanitizer {
 
+    const val EMPTY_NOTE_PREFIX = "未备注"
+
     private val DATE_FORMATTER: DateTimeFormatter =
         DateTimeFormatter.ofPattern("yyyyMMdd", Locale.US)
 
@@ -41,7 +43,7 @@ object FileNameSanitizer {
             "${sanitizedNote}_${datePart}"
         } else {
             val timePart = TIME_FORMATTER.format(zdt)
-            "未备注_${datePart}_${timePart}"
+            "${EMPTY_NOTE_PREFIX}_${datePart}_${timePart}"
         }
 
         val normalizedExisting = existingNames.map { it.lowercase(Locale.ROOT) }.toSet()

@@ -85,7 +85,6 @@ import coil.compose.AsyncImage
 import com.stamper.app.data.ProjectItem
 import com.stamper.app.data.StamperRepository
 import com.stamper.app.domain.stamper.StamperSettings
-import com.stamper.app.service.CameraWatchService
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -100,57 +99,14 @@ fun HomeScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val lifecycleOwner = LocalLifecycleOwner.current
 
     val projects by repository.projects.collectAsState()
     val activeProjectId by repository.settingsRepository.activeProjectIdFlow.collectAsState(initial = 1L)
     val settings by repository.settingsRepository.settingsFlow.collectAsState(initial = StamperSettings())
-    val serviceRunning by CameraWatchService.isRunning.collectAsState()
 
     var showCreateProjectDialog by remember { mutableStateOf(false) }
     var showQuickSwitchDialog by remember { mutableStateOf(false) }
     var newProjectName by remember { mutableStateOf("") }
-
-    var canDrawOverlays by remember { mutableStateOf(Settings.canDrawOverlays(context)) }
-    var hasMicPerm by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                PackageManager.PERMISSION_GRANTED
-        )
-    }
-    var hasMediaReadPerm by remember { mutableStateOf(checkMediaReadPermission(context)) }
-
-    // Refresh permission states when returning from system settings
-    DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                canDrawOverlays = Settings.canDrawOverlays(context)
-                hasMicPerm = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.RECORD_AUDIO
-                ) == PackageManager.PERMISSION_GRANTED
-                hasMediaReadPerm = checkMediaReadPermission(context)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    val watchPermissionsLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { _ ->
-        hasMicPerm = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-        hasMediaReadPerm = checkMediaReadPermission(context)
-        if (hasMediaReadPerm) {
-            scope.launch {
-                repository.settingsRepository.setCameraWatchEnabled(true)
-            }
-            CameraWatchService.start(context)
-        }
-    }
 
     val photoPickerLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia(maxItems = 30)
@@ -259,7 +215,7 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "拍照后直接说出位置（如“302教室东南角投影仪”），画面角落仅印语音备注，同时写入 EXIF/XMP 供电脑端 AI 自动分类。",
+                            text = "拍照后直接说出位置（如“302教室东南角投影仪”），备注写进文件名和 EXIF/XMP 供电脑端 AI 自动分类；进入项目可批量加信息卡水印。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                         )
@@ -303,97 +259,7 @@ fun HomeScreen(
                 }
             }
 
-            // 2. Background System Camera Watcher Card
-            item {
-                OutlinedCard(
-                    shape = RoundedCornerShape(18.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Visibility,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "后台监听手机原生相机",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(
-                                    text = if (serviceRunning) {
-                                        if (canDrawOverlays) "运行中：用系统相机拍照后自动弹出语音框"
-                                        else "运行中：未开悬浮窗，拍照后将通过通知提醒录入"
-                                    } else {
-                                        "开启后用手机自带相机拍照，也会弹出语音备注框"
-                                    },
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = serviceRunning || settings.cameraWatchEnabled,
-                                onCheckedChange = { wantEnable ->
-                                    if (wantEnable) {
-                                        val needed = buildWatchPermissionsList()
-                                        if (!checkMediaReadPermission(context) || !hasMicPerm) {
-                                            watchPermissionsLauncher.launch(needed.toTypedArray())
-                                        } else {
-                                            scope.launch {
-                                                repository.settingsRepository.setCameraWatchEnabled(true)
-                                            }
-                                            CameraWatchService.start(context)
-                                        }
-                                    } else {
-                                        scope.launch {
-                                            repository.settingsRepository.setCameraWatchEnabled(false)
-                                        }
-                                        CameraWatchService.stop(context)
-                                    }
-                                }
-                            )
-                        }
-
-                        if (!canDrawOverlays || !hasMicPerm) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                if (!canDrawOverlays) {
-                                    AssistChip(
-                                        onClick = {
-                                            val intent = Intent(
-                                                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                                Uri.parse("package:${context.packageName}")
-                                            )
-                                            runCatching { context.startActivity(intent) }
-                                        },
-                                        label = { Text("开启悬浮窗权限（推荐）") }
-                                    )
-                                }
-                                if (!hasMicPerm) {
-                                    AssistChip(
-                                        onClick = {
-                                            watchPermissionsLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO))
-                                        },
-                                        label = { Text("授予麦克风权限") }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 3. Projects Header
+            // 2. Projects Header
             item {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -704,36 +570,6 @@ private fun ProjectCard(
                 }
             }
         }
-    }
-}
-
-private fun checkMediaReadPermission(context: android.content.Context): Boolean {
-    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_MEDIA_IMAGES
-        ) == PackageManager.PERMISSION_GRANTED
-    } else {
-        ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-}
-
-private fun buildWatchPermissionsList(): List<String> = buildList {
-    add(Manifest.permission.RECORD_AUDIO)
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        add(Manifest.permission.READ_MEDIA_IMAGES)
-        add(Manifest.permission.POST_NOTIFICATIONS)
-    } else {
-        add(Manifest.permission.READ_EXTERNAL_STORAGE)
-        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-            add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
-    }
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-        add(Manifest.permission.ACCESS_MEDIA_LOCATION)
     }
 }
 

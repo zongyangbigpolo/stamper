@@ -9,7 +9,7 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
 
-    <!-- Media permissions for watching system camera photos and preserving GPS EXIF -->
+    <!-- Media permissions for gallery import and preserving GPS EXIF -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
     <uses-permission
@@ -20,13 +20,6 @@
         android:maxSdkVersion="28"
         tools:ignore="ScopedStorage" />
     <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />
-
-    <!-- Overlay & Foreground Service for watching native system camera -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <!-- Android 11+ package visibility required for system & Chinese OEM SpeechRecognizer engines -->
     <queries>
@@ -101,16 +94,6 @@
                 <data android:mimeType="image/*" />
             </intent-filter>
         </activity>
-
-        <service
-            android:name=".service.CameraWatchService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse|microphone">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Observe newly captured system camera photos in real time so field engineers can immediately attach voice-transcribed EXIF and watermark annotations." />
-        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

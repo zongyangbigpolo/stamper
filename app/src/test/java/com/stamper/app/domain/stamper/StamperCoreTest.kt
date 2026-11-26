@@ -117,6 +117,45 @@ class StamperCoreTest {
     }
 
     @Test
+    fun `info card content falls back to file name and strips date suffix`() {
+        assertEquals("路由器", InfoCard.resolveContent("", "路由器_20261125.jpg"))
+        assertEquals("路由器", InfoCard.resolveContent("  ", "路由器_20261125_3.jpg"))
+        assertEquals("", InfoCard.resolveContent("", "未备注_20261125_100512.jpg"))
+        assertEquals("302教室投影仪", InfoCard.resolveContent(" 302教室投影仪 ", "whatever_20261125.jpg"))
+    }
+
+    @Test
+    fun `info card rows follow toggles and skip empty content or location`() {
+        val all = InfoCard.buildContent(
+            title = " 安徽工业大学智慧校园全光网扩建项目 ",
+            capturedAtMillis = sampleMillis,
+            note = "",
+            fileName = "路由器_20261125.jpg",
+            style = InfoCardStyle(location = "马鞍山市花山区·绿地臻城"),
+            zoneId = shanghaiZone
+        )
+        assertEquals("安徽工业大学智慧校园全光网扩建项目", all.title)
+        assertEquals(
+            listOf(
+                InfoCardRow("拍摄时间", "2026.11.25 10:05"),
+                InfoCardRow("拍摄内容", "路由器"),
+                InfoCardRow("地点", "马鞍山市花山区·绿地臻城")
+            ),
+            all.rows
+        )
+
+        val trimmed = InfoCard.buildContent(
+            title = "T",
+            capturedAtMillis = sampleMillis,
+            note = "",
+            fileName = "未备注_20261125_100512.jpg",
+            style = InfoCardStyle(showTime = false, location = ""),
+            zoneId = shanghaiZone
+        )
+        assertTrue(trimmed.rows.isEmpty())
+    }
+
+    @Test
     fun `appendRecognizedSegment merges partial dictation without dropping prior text`() {
         assertEquals(
             "302教室 东南角投影仪",

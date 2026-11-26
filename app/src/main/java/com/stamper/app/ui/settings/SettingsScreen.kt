@@ -142,8 +142,8 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingSwitchRow(
-                        title = "开启画面边角文字水印",
-                        subtitle = "将语音识别出的配件说明印在照片角落（不印日期与项目名）",
+                        title = "拍照时印角落文字水印",
+                        subtitle = "拍照保存时把语音备注印在照片角落（默认关闭；推荐在项目里用批量信息卡水印）",
                         checked = settings.watermarkEnabled,
                         onCheckedChange = {
                             scope.launch { settingsRepository.setWatermarkEnabled(it) }

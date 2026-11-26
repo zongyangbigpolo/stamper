@@ -42,6 +42,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BrandingWatermark
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -188,6 +189,9 @@ fun ProjectDetailScreen(
     var showDeletePhotosConfirmDialog by remember { mutableStateOf(false) }
     var isDeletingPhotos by remember { mutableStateOf(false) }
 
+    // Batch info-card watermark (selected photos, or all photos from the top bar)
+    var watermarkPhotoIds by remember { mutableStateOf<List<Long>>(emptyList()) }
+
     var showDeleteProjectDialog by remember { mutableStateOf(false) }
     var showRenameProjectDialog by remember { mutableStateOf(false) }
     var renamingProjectText by remember { mutableStateOf("") }
@@ -293,6 +297,11 @@ fun ProjectDetailScreen(
                     },
                     actions = {
                         if (photos.isNotEmpty()) {
+                            IconButton(onClick = { watermarkPhotoIds = filteredPhotos.map { it.id } }) {
+                                Icon(Icons.Default.BrandingWatermark, contentDescription = "批量添加信息水印")
+                            }
+                        }
+                        if (photos.isNotEmpty()) {
                             IconButton(
                                 onClick = {
                                     selectionMode = true
@@ -349,59 +358,48 @@ fun ProjectDetailScreen(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
                     ) {
-                        Button(
-                            enabled = selectedPhotoIds.isNotEmpty(),
+                        val enabled = selectedPhotoIds.isNotEmpty()
+                        SelectionActionButton(
+                            icon = Icons.Default.BrandingWatermark,
+                            label = "加水印",
+                            enabled = enabled,
+                            emphasized = true,
+                            onClick = { watermarkPhotoIds = filteredPhotos.map { it.id }.filter { it in selectedPhotoIds } },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SelectionActionButton(
+                            icon = Icons.AutoMirrored.Filled.DriveFileMove,
+                            label = "变更分组",
+                            enabled = enabled,
                             onClick = {
                                 movingPhotoIds = selectedPhotoIds.toList()
                                 showMoveProjectDialog = true
                             },
-                            shape = RoundedCornerShape(14.dp),
-                            modifier = Modifier.weight(1.4f)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.DriveFileMove,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("变更分组", maxLines = 1)
-                        }
-
-                        FilledTonalButton(
-                            enabled = selectedPhotoIds.isNotEmpty(),
-                            onClick = { sharePhotosByIds(selectedPhotoIds) },
-                            shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("分享", maxLines = 1)
-                        }
-
-                        OutlinedButton(
-                            enabled = selectedPhotoIds.isNotEmpty(),
+                        )
+                        SelectionActionButton(
+                            icon = Icons.Default.Share,
+                            label = "分享",
+                            enabled = enabled,
+                            onClick = { sharePhotosByIds(selectedPhotoIds) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        SelectionActionButton(
+                            icon = Icons.Default.Delete,
+                            label = "删除",
+                            enabled = enabled,
+                            destructive = true,
                             onClick = {
                                 deletingPhotoIds = selectedPhotoIds.toList()
                                 showDeletePhotosConfirmDialog = true
                             },
-                            shape = RoundedCornerShape(14.dp),
                             modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("删除", color = MaterialTheme.colorScheme.error, maxLines = 1)
-                        }
+                        )
                     }
                 }
             }
@@ -1048,6 +1046,19 @@ fun ProjectDetailScreen(
         )
     }
 
+    if (watermarkPhotoIds.isNotEmpty() && project != null) {
+        BatchWatermarkDialog(
+            project = project,
+            photos = watermarkPhotoIds.mapNotNull { id -> photos.firstOrNull { it.id == id } },
+            repository = repository,
+            onDismiss = {
+                watermarkPhotoIds = emptyList()
+                selectionMode = false
+                selectedPhotoIds = emptySet()
+            }
+        )
+    }
+
     if (showDeleteProjectDialog && project != null) {
         AlertDialog(
             onDismissRequest = { showDeleteProjectDialog = false },
@@ -1470,6 +1481,43 @@ private fun MetadataSection(label: String, value: String) {
                 text = value,
                 style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
                 modifier = Modifier.padding(8.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun SelectionActionButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    enabled: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+    destructive: Boolean = false
+) {
+    val tint = when {
+        !enabled -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+        destructive -> MaterialTheme.colorScheme.error
+        emphasized -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    TextButton(
+        onClick = onClick,
+        enabled = enabled,
+        shape = RoundedCornerShape(12.dp),
+        contentPadding = PaddingValues(vertical = 6.dp, horizontal = 2.dp),
+        modifier = modifier
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = label,
+                color = tint,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1
             )
         }
     }

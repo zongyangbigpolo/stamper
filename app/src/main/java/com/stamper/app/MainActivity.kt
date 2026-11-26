@@ -35,7 +35,6 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.stamper.app.domain.stamper.CaptureSource
 import com.stamper.app.domain.stamper.StamperSettings
-import com.stamper.app.service.CameraWatchService
 import com.stamper.app.ui.camera.CameraScreen
 import com.stamper.app.ui.components.VoiceNoteInputCard
 import com.stamper.app.ui.home.HomeScreen
@@ -80,23 +79,6 @@ class MainActivity : ComponentActivity() {
                 fun handleIncomingIntent(intent: Intent?) {
                     if (intent == null) return
                     when (intent.action) {
-                        CameraWatchService.ACTION_ANNOTATE_EXTERNAL_URI -> {
-                            val uriStr = intent.getStringExtra(CameraWatchService.EXTRA_PHOTO_URI)
-                            val ts = intent.getLongExtra(
-                                CameraWatchService.EXTRA_CAPTURED_AT,
-                                System.currentTimeMillis()
-                            )
-                            if (!uriStr.isNullOrBlank()) {
-                                importQueue.add(
-                                    QueuedImportPhoto(
-                                        uri = Uri.parse(uriStr),
-                                        capturedAtMillis = ts,
-                                        source = CaptureSource.SYSTEM_CAMERA_OVERLAY
-                                    )
-                                )
-                            }
-                        }
-
                         Intent.ACTION_SEND -> {
                             if (intent.type?.startsWith("image/") == true) {
                                 extractSingleStreamUri(intent)?.let { uri ->
@@ -133,13 +115,6 @@ class MainActivity : ComponentActivity() {
                     }
                     incomingIntents.collect { newIntent ->
                         handleIncomingIntent(newIntent)
-                    }
-                }
-
-                // Auto-restore CameraWatchService if enabled previously
-                LaunchedEffect(settings.cameraWatchEnabled) {
-                    if (settings.cameraWatchEnabled && !CameraWatchService.isRunning.value) {
-                        runCatching { CameraWatchService.start(this@MainActivity) }
                     }
                 }
 

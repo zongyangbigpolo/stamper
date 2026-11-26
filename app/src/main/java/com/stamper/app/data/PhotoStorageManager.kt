@@ -32,6 +32,7 @@ data class SavedMediaResult(
 object PhotoStorageManager {
 
     const val ROOT_FOLDER = "Stamper"
+    const val WATERMARK_SUBFOLDER = "水印版"
 
     fun buildRelativePath(projectFolderName: String): String =
         "${Environment.DIRECTORY_PICTURES}/$ROOT_FOLDER/$projectFolderName"
@@ -126,6 +127,46 @@ object PhotoStorageManager {
             val scannedUri = scanFileForMediaUri(context, outFile)
                 ?: Uri.fromFile(outFile)
             SavedMediaResult(uri = scannedUri, relativePath = relativePath)
+        }
+    }
+
+    /** Like [saveStampedJpeg] but first removes an existing file with the same name in that folder. */
+    suspend fun saveOrReplaceJpeg(
+        context: Context,
+        folderPath: String,
+        fileName: String,
+        jpegBytes: ByteArray,
+        capturedAtMillis: Long
+    ): SavedMediaResult = withContext(Dispatchers.IO) {
+        deleteExistingByName(context, folderPath, fileName)
+        saveStampedJpeg(context, folderPath, fileName, jpegBytes, capturedAtMillis)
+    }
+
+    private fun deleteExistingByName(context: Context, folderPath: String, fileName: String) {
+        val relPath = buildRelativePath(folderPath)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val resolver = context.contentResolver
+            val collection = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            runCatching {
+                resolver.query(
+                    collection,
+                    arrayOf(MediaStore.Images.Media._ID),
+                    "${MediaStore.Images.Media.DISPLAY_NAME} = ? AND " +
+                        "${MediaStore.Images.Media.RELATIVE_PATH} IN (?, ?)",
+                    arrayOf(fileName, relPath, "$relPath/"),
+                    null
+                )?.use { cursor ->
+                    val idIdx = cursor.getColumnIndexOrThrow(MediaStore.Images.Media._ID)
+                    while (cursor.moveToNext()) {
+                        val uri = android.content.ContentUris.withAppendedId(collection, cursor.getLong(idIdx))
+                        runCatching { resolver.delete(uri, null, null) }
+                    }
+                }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            val picturesDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+            runCatching { File(picturesDir, "$ROOT_FOLDER/$folderPath/$fileName").delete() }
         }
     }
 

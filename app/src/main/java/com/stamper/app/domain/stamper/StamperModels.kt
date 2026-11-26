@@ -25,6 +25,7 @@ enum class WatermarkScale(val label: String, val factor: Float) {
 
 enum class CaptureSource(val wireValue: String, val label: String) {
     IN_APP_CAMERA("in_app_camera", "应用内连拍"),
+    // Legacy: photos captured by the removed system-camera watcher.
     SYSTEM_CAMERA_OVERLAY("system_camera_overlay", "系统相机监听"),
     GALLERY_IMPORT("gallery_import", "相册补录");
 
@@ -35,13 +36,12 @@ enum class CaptureSource(val wireValue: String, val label: String) {
 }
 
 data class StamperSettings(
-    val watermarkEnabled: Boolean = true,
+    val watermarkEnabled: Boolean = false,
     val exifEnabled: Boolean = true,
     val watermarkCorner: WatermarkCorner = WatermarkCorner.BOTTOM_LEFT,
     val watermarkScale: WatermarkScale = WatermarkScale.NORMAL,
     val autoStartSpeech: Boolean = true,
-    val jpegQuality: Int = 92,
-    val cameraWatchEnabled: Boolean = false
+    val jpegQuality: Int = 92
 )
 
 /**
