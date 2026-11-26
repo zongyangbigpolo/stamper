@@ -331,7 +331,7 @@ fun VoiceNoteInputCard(
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
                             Text(
-                                text = "选择归档项目分组（不印入画面水印）：",
+                                text = "选择归档分组：",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

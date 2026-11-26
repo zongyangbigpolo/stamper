@@ -68,7 +68,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("水印与元数据设置", fontWeight = FontWeight.Bold) },
+                title = { Text("设置", fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
@@ -116,7 +116,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "与实际导出 JPEG 使用同一渲染引擎：仅印语音录入内容，不带日期与项目名",
+                        text = "实际效果预览",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -143,7 +143,7 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp)) {
                     SettingSwitchRow(
                         title = "拍照时印角落文字水印",
-                        subtitle = "拍照保存时把语音备注印在照片角落（默认关闭；推荐在项目里用批量信息卡水印）",
+                        subtitle = "拍照时把备注印在照片角落",
                         checked = settings.watermarkEnabled,
                         onCheckedChange = {
                             scope.launch { settingsRepository.setWatermarkEnabled(it) }
@@ -152,8 +152,8 @@ fun SettingsScreen(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
 
                     SettingSwitchRow(
-                        title = "开启 EXIF + XMP 元数据双写",
-                        subtitle = "嵌入结构化 stamper.v1 JSON 与 UTF-8 中文 XMP，供电脑端 AI Agent 零乱码解析",
+                        title = "在照片里保存备注信息",
+                        subtitle = "电脑上可读取拍摄时间、分组和备注",
                         checked = settings.exifEnabled,
                         onCheckedChange = {
                             scope.launch { settingsRepository.setExifEnabled(it) }
@@ -163,7 +163,7 @@ fun SettingsScreen(
 
                     SettingSwitchRow(
                         title = "拍完自动开始语音听写",
-                        subtitle = "弹出录入框后自动启动麦克风识别，省去再点一次按钮",
+                        subtitle = "拍完自动开始听写",
                         checked = settings.autoStartSpeech,
                         onCheckedChange = {
                             scope.launch { settingsRepository.setAutoStartSpeech(it) }
@@ -243,17 +243,14 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "电脑端 AI Agent 导出说明",
+                        text = "导出到电脑",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "1. 文件命名：<语音内容>_<yyyyMMdd>.jpg（例：302教室东南角投影仪_20261125.jpg）\n" +
-                            "2. 数据线直拷：连接电脑打开 内部存储/Pictures/Stamper/<项目名>/ 即可直接复制。\n" +
-                            "3. 压缩包导出：在项目页点击右上角 ZIP 按钮，自动附带 manifest.json 清单。\n" +
-                            "4. 元数据读取：支持读取 EXIF UserComment (stamper.v1 JSON) 或 XMP dc:description。",
+                        text = "用数据线连接电脑，打开 内部存储/Pictures/Stamper 即可复制；也可在项目页点 ZIP 按钮打包分享。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -334,7 +331,7 @@ private fun buildSampleSiteBackdropBitmap(): Bitmap {
         textSize = 28f
         textAlign = Paint.Align.CENTER
     }
-    canvas.drawText("（施工现场实拍画面 · 1:1 真实水印比例预览）", width / 2f, height / 2f + 10f, hintPaint)
+    canvas.drawText("示例照片", width / 2f, height / 2f + 10f, hintPaint)
     return bmp
 }
 

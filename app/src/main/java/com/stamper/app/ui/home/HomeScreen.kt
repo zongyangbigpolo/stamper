@@ -215,7 +215,7 @@ fun HomeScreen(
 
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "拍照后直接说出位置（如“302教室东南角投影仪”），备注写进文件名和 EXIF/XMP 供电脑端 AI 自动分类；进入项目可批量加信息卡水印。",
+                            text = "拍完说一句位置（如“302教室投影仪”），自动命名归档",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                         )
@@ -273,7 +273,7 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "点卡片浏览管理或迁移照片 · 路径 Pictures/Stamper/<项目名>",
+                            text = "点卡片查看照片",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -327,7 +327,7 @@ fun HomeScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(
-                        text = "新拍或相册补录的照片默认归入所选项目分组：",
+                        text = "新照片存入所选分组：",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -382,7 +382,7 @@ fun HomeScreen(
                     singleLine = true,
                     label = { Text("项目名称（如：实验楼弱电安装）") },
                     supportingText = {
-                        Text("将在手机相册 Pictures/Stamper/ 下创建同名文件夹（不会印在照片画面水印上）")
+                        Text("照片保存在相册 Stamper/<分组名> 文件夹")
                     }
                 )
             },

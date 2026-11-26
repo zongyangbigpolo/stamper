@@ -53,6 +53,7 @@ import androidx.compose.material.icons.filled.Code
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.FolderZip
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
@@ -436,7 +437,7 @@ fun ProjectDetailScreen(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "点击右下角“拍入此分组”即可边拍边说，也可在其他分组长按照片将其迁移到这里。",
+                        text = "点右下角“拍入此分组”开始拍照",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -482,7 +483,7 @@ fun ProjectDetailScreen(
                 ) {
                     Text(
                         text = if (searchQuery.isBlank()) {
-                            "提示：长按照片可批量选择并变更项目分组"
+                            "长按照片可多选"
                         } else {
                             "搜索到 ${filteredPhotos.size} / ${photos.size} 张照片"
                         },
@@ -696,9 +697,9 @@ fun ProjectDetailScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Icon(Icons.Default.Code, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(17.dp))
                         Spacer(modifier = Modifier.width(6.dp))
-                        Text("查看元数据", maxLines = 1)
+                        Text("照片信息", maxLines = 1)
                     }
                 }
 
@@ -838,7 +839,7 @@ fun ProjectDetailScreen(
             },
             title = { Text(if (count == 1) "确认删除这张照片？" else "确认删除选中的 $count 张照片？") },
             text = {
-                Text("删除后将同时移除手机相册 Pictures/Stamper 下的对应照片文件，此操作无法恢复。")
+                Text("照片文件会一起删除，无法恢复。")
             },
             confirmButton = {
                 Button(
@@ -885,14 +886,14 @@ fun ProjectDetailScreen(
         val targetPhoto = selectedPhoto!!
         AlertDialog(
             onDismissRequest = { if (!isUpdatingNote) showEditNoteDialog = false },
-            title = { Text("更新备注元数据与文件名") },
+            title = { Text("修改备注") },
             text = {
                 OutlinedTextField(
                     value = editingNoteText,
                     onValueChange = { editingNoteText = it },
                     label = { Text("照片说明") },
                     supportingText = {
-                        Text("将同步更新照片内部的 EXIF UserComment、XMP 描述以及图片文件名（已合成在画面上的像素水印保持不变）")
+                        Text("照片文件名会随备注一起更新")
                     },
                     maxLines = 4
                 )
@@ -939,11 +940,10 @@ fun ProjectDetailScreen(
         )
     }
 
-    // Live EXIF & XMP Inspector Dialog
     if (showMetadataDialog) {
         AlertDialog(
             onDismissRequest = { showMetadataDialog = false },
-            title = { Text("照片内嵌 EXIF / XMP 校验") },
+            title = { Text("照片信息") },
             text = {
                 if (isLoadingMetadata) {
                     Box(
@@ -962,22 +962,21 @@ fun ProjectDetailScreen(
                             .fillMaxWidth()
                             .verticalScroll(rememberScrollState())
                     ) {
+                        val meta = info?.parsedStamperMetadata
                         MetadataSection(
-                            label = "EXIF UserComment 解析结果 (AI 推荐直读)",
-                            value = info?.parsedStamperMetadata?.toPrettyUtf8Json() ?: "（无结构化 JSON）"
+                            label = "拍摄时间",
+                            value = selectedPhoto?.let {
+                                com.stamper.app.domain.stamper.InfoCard.formatCaptureTime(it.capturedAt)
+                            } ?: "未知"
                         )
+                        MetadataSection(label = "分组", value = meta?.project ?: project?.name ?: "未知")
+                        MetadataSection(label = "备注", value = meta?.note?.ifBlank { null } ?: "（无）")
+                        MetadataSection(label = "尺寸", value = info?.dimensions ?: "未知")
                         MetadataSection(
-                            label = "EXIF ImageDescription",
-                            value = info?.imageDescription ?: "（空）"
-                        )
-                        MetadataSection(
-                            label = "EXIF DateTimeOriginal & 尺寸",
-                            value = "${info?.dateTimeOriginal ?: "未知"} | ${info?.dimensions ?: "未知"}" +
-                                (info?.gpsLatLng?.let { "\nGPS: ${it.first}, ${it.second}" } ?: "")
-                        )
-                        MetadataSection(
-                            label = "XMP UTF-8 数据包 (dc:description)",
-                            value = info?.xmpPacket ?: "（未检测到 XMP 段）"
+                            label = "位置",
+                            value = info?.gpsLatLng?.let {
+                                String.format(java.util.Locale.US, "%.5f, %.5f", it.first, it.second)
+                            } ?: "（照片未记录位置）"
                         )
                     }
                 }
@@ -1001,7 +1000,7 @@ fun ProjectDetailScreen(
                     singleLine = true,
                     label = { Text("项目名称") },
                     supportingText = {
-                        Text("该分组内的照片文件夹与 EXIF/XMP 项目名也将自动同步更新")
+                        Text("相册里的文件夹会同步改名")
                     },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1148,7 +1147,7 @@ private fun MovePhotosProjectDialog(
                     .verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    text = "迁移后将自动同步更新手机相册 Pictures/Stamper/<目标分组> 目录及照片 EXIF/XMP 项目信息：",
+                    text = "选择目标分组：",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1162,7 +1161,7 @@ private fun MovePhotosProjectDialog(
                             .padding(vertical = 12.dp)
                     ) {
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.5.dp)
-                        Text("正在迁移照片文件并更新元数据…", style = MaterialTheme.typography.bodyMedium)
+                        Text("正在移动照片…", style = MaterialTheme.typography.bodyMedium)
                     }
                 } else {
                     projects.forEach { item ->
@@ -1479,7 +1478,7 @@ private fun MetadataSection(label: String, value: String) {
         ) {
             Text(
                 text = value,
-                style = MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace),
+                style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(8.dp)
             )
         }
